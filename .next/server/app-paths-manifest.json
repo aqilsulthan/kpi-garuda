@@ -1,0 +1,4 @@
+{
+  "/planning/[period]/page": "app/planning/[period]/page.js",
+  "/api/dify/route": "app/api/dify/route.js"
+}
