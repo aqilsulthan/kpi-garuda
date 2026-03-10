@@ -1,0 +1,257 @@
+app:
+  description: >-
+    Chatflow asisten KPI maskapai penerbangan.
+    Mendukung role admin, corporate_planning dan direksi.
+    Menjawab pertanyaan tentang laporan KPI, memberikan insight,
+    dan membantu memperkaya draft analisis.
+  icon: "\U0001F916"
+  icon_background: "#D1FAE5"
+  icon_type: emoji
+  mode: advanced-chat
+  name: kpi-assistant
+  use_icon_as_answer_icon: true
+kind: app
+version: 0.1.5
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      image:
+        enabled: false
+    opening_statement: >-
+      Halo! Saya KPI Assistant. Saya bisa membantu Anda:
+
+      - 📊 Menganalisis data KPI departemen
+
+      - 📋 Membuat ringkasan laporan
+
+      - 💡 Memberikan rekomendasi improvement
+
+      - ❓ Menjawab pertanyaan tentang performa KPI
+
+
+      Silakan ajukan pertanyaan Anda.
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+      - Apa KPI yang paling underperform bulan ini?
+      - Berikan ringkasan performa keseluruhan
+      - Apa rekomendasi untuk meningkatkan KPI yang merah?
+    suggested_questions_after_answer:
+      enabled: true
+    text_to_speech:
+      enabled: false
+      language: ""
+      voice: ""
+  graph:
+    edges:
+      - data:
+          isInIteration: false
+          sourceType: start
+          targetType: knowledge-retrieval
+        id: start-knowledge
+        source: start
+        target: knowledge
+      - data:
+          isInIteration: false
+          sourceType: knowledge-retrieval
+          targetType: llm
+        id: knowledge-llm
+        source: knowledge
+        target: llm_assistant
+      - data:
+          isInIteration: false
+          sourceType: llm
+          targetType: answer
+        id: llm-answer
+        source: llm_assistant
+        target: answer
+    nodes:
+      - data:
+          desc: ""
+          title: Start
+          type: start
+          variables:
+            - label: Role Pengguna
+              max_length: 48
+              options:
+                - admin
+                - corporate_planning
+                - direksi
+              required: true
+              type: select
+              variable: role
+            - label: Konteks Data (JSON)
+              max_length: 65536
+              required: false
+              type: paragraph
+              variable: context
+        height: 116
+        id: start
+        position:
+          x: 80
+          y: 282
+        type: custom
+        width: 244
+      - data:
+          dataset_ids: []
+          desc: Ambil konteks relevan dari Knowledge Base kpi-context
+          multiple_retrieval_config:
+            reranking_enable: false
+            score_threshold: 0.5
+            score_threshold_enabled: true
+            top_k: 5
+          query_variable_selector:
+            - sys
+            - query
+          retrieval_mode: multiple
+          single_retrieval_config:
+            model:
+              completion_params:
+                temperature: 0.3
+              mode: chat
+              name: qwen-max
+              provider: tongyi
+          title: Knowledge Retrieval
+          type: knowledge-retrieval
+        height: 54
+        id: knowledge
+        position:
+          x: 400
+          y: 282
+        type: custom
+        width: 244
+      - data:
+          context:
+            enabled: true
+            variable_selector:
+              - knowledge
+              - result
+          desc: Asisten AI role-aware untuk KPI
+          memory:
+            role_prefix:
+              assistant: KPI Assistant
+              user: Pengguna
+            window:
+              enabled: true
+              size: 10
+          model:
+            completion_params:
+              max_tokens: 4096
+              temperature: 0.5
+              top_p: 0.9
+            mode: chat
+            name: qwen-max
+            provider: tongyi
+          prompt_template:
+            - role: system
+              text: >-
+                Kamu adalah KPI Management Assistant untuk perusahaan maskapai
+                penerbangan PT X.
+
+
+                Role pengguna saat ini: {{#start.role#}}
+
+                Konteks data yang tersedia: {{#start.context#}}
+
+
+                --- PANDUAN BERDASARKAN ROLE ---
+
+
+                Jika role = "admin":
+
+                - Berikan penjelasan secara sistem, teknis, manajemen struktur, maupun pengaturan ekosistem KPI
+
+                - Boleh membantu menemukan isu secara struktural serta memberikan saran penyelarasan KPI
+
+                - Bahasa dapat lebih luwes namun tetap profesional
+
+
+                Jika role = "corporate_planning":
+
+                - Bantu menganalisis, memperkaya, dan menyempurnakan draft
+                laporan KPI
+
+                - Berikan insight tambahan berdasarkan data eksternal dan
+                konteks industri penerbangan
+
+                - Bisa diminta menambahkan analisis per KPI, memperbaiki
+                narasi, atau menambah rekomendasi
+
+                - Gunakan bahasa Indonesia formal dan teknis
+
+                - Boleh menyertakan data angka, perbandingan, dan referensi
+                industri
+
+
+                Jika role = "direksi":
+
+                - Jawab pertanyaan secara ringkas, jelas, dan actionable
+
+                - Fokus pada dampak bisnis dan rekomendasi strategis
+
+                - Hindari detail teknis yang tidak perlu
+
+                - Gunakan bullet points dan highlight key numbers
+
+
+                --- ATURAN GRADE KPI ---
+
+                🟢 Hijau: total_score >= 90%
+
+                🟡 Kuning: total_score 75-89%
+
+                🔴 Merah: total_score < 75%
+
+
+                --- RUMUS KALKULASI ---
+
+                Polaritas MAX: ach_rate = actual / target
+
+                Polaritas MIN: ach_rate = target / actual (semakin kecil
+                actual = semakin baik)
+
+                Score = ach_rate x bobot
+
+                Total Score = jumlah seluruh score
+
+
+                --- ATURAN UMUM ---
+
+                - Selalu referensikan data aktual dari konteks yang diberikan
+
+                - Jangan membuat data atau angka fiktif
+
+                - Jika data tidak tersedia, sampaikan dengan jelas
+
+                - Gunakan bahasa Indonesia yang baik dan benar
+            - role: user
+              text: "{{#sys.query#}}"
+          title: KPI Assistant
+          type: llm
+          vision:
+            enabled: false
+        height: 98
+        id: llm_assistant
+        position:
+          x: 720
+          y: 282
+        type: custom
+        width: 244
+      - data:
+          answer: "{{#llm_assistant.text#}}"
+          desc: ""
+          title: Answer
+          type: answer
+        height: 107
+        id: answer
+        position:
+          x: 1060
+          y: 282
+        type: custom
+        width: 244

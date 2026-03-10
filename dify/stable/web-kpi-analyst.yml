@@ -1,0 +1,446 @@
+app:
+  description:
+    "Workflow analisis KPI maskapai penerbangan. 3 action: analyze, summarize,
+    suggest. Menggunakan Knowledge Base kpi-context dan data eksternal."
+  icon: 🤖
+  icon_background: "#E0F2FE"
+  mode: workflow
+  name: web-kpi-analyst
+  use_icon_as_answer_icon: false
+dependencies:
+  - current_identifier: null
+    type: marketplace
+    value:
+      marketplace_plugin_unique_identifier: langgenius/tongyi:0.1.30@04fa1c28928e92e425bc946f8f4f5c8f14d0531786c384f128c0e9445f1eee56
+      version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+        - .JPG
+        - .JPEG
+        - .PNG
+        - .GIF
+        - .WEBP
+        - .SVG
+      allowed_file_types:
+        - image
+      allowed_file_upload_methods:
+        - local_file
+        - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+          - local_file
+          - remote_url
+      number_limits: 3
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ""
+      voice: ""
+  graph:
+    edges:
+      - data:
+          isInIteration: false
+          sourceType: start
+          targetType: knowledge-retrieval
+        id: start-knowledge
+        source: start
+        sourceHandle: source
+        target: knowledge
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: knowledge-retrieval
+          targetType: if-else
+        id: knowledge-branch
+        source: knowledge
+        sourceHandle: source
+        target: branch
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: if-else
+          targetType: llm
+        id: branch-analyze
+        source: branch
+        sourceHandle: case_analyze
+        target: llm_analyze
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: if-else
+          targetType: llm
+        id: branch-summarize
+        source: branch
+        sourceHandle: case_summarize
+        target: llm_summarize
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: if-else
+          targetType: llm
+        id: branch-suggest
+        source: branch
+        sourceHandle: "false"
+        target: llm_suggest
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: llm
+          targetType: end
+        id: summarize-end
+        source: llm_summarize
+        sourceHandle: source
+        target: end_node
+        targetHandle: target
+        type: custom
+      - data:
+          isInLoop: false
+          sourceType: llm
+          targetType: end
+        id: llm_analyze-source-1772898299563-target
+        source: llm_analyze
+        sourceHandle: source
+        target: "1772898299563"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: llm
+          targetType: end
+        id: llm_suggest-source-1772898321116-target
+        source: llm_suggest
+        sourceHandle: source
+        target: "1772898321116"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+    nodes:
+      - data:
+          desc: ""
+          selected: false
+          title: Start
+          type: start
+          variables:
+            - label: Action
+              max_length: 48
+              options:
+                - analyze
+                - summarize
+                - suggest
+              required: true
+              type: select
+              variable: action
+            - label: Nama Departemen
+              max_length: 255
+              required: true
+              type: text-input
+              variable: dept_name
+            - label: Periode (YYYY-MM)
+              max_length: 7
+              required: true
+              type: text-input
+              variable: period
+            - label: KPI Data (JSON)
+              max_length: 65536
+              required: true
+              type: paragraph
+              variable: kpi_data
+            - label: External Data (JSON)
+              max_length: 65536
+              required: false
+              type: paragraph
+              variable: external_data
+        height: 212
+        id: start
+        position:
+          x: 0
+          y: 109
+        positionAbsolute:
+          x: 0
+          y: 109
+        selected: false
+        type: custom
+        width: 242
+      - data:
+          dataset_ids:
+            - Ue95WEwzPBAoBEuBAdDh/F6tcivqZwRCieOT/jf9PJICKYFb7cuI+owDb59qQ0vG
+          desc: Ambil konteks dari Knowledge Base kpi-context
+          multiple_retrieval_config:
+            reranking_enable: true
+            reranking_mode: reranking_model
+            reranking_model:
+              model: gte-rerank
+              provider: langgenius/tongyi/tongyi
+            score_threshold: 0.5
+            top_k: 5
+          query_attachment_selector: []
+          query_variable_selector:
+            - start
+            - dept_name
+          retrieval_mode: multiple
+          selected: false
+          single_retrieval_config:
+            model:
+              completion_params:
+                temperature: 0.3
+              mode: chat
+              name: qwen-max
+              provider: tongyi
+          title: Knowledge Retrieval
+          type: knowledge-retrieval
+        height: 95
+        id: knowledge
+        position:
+          x: 342
+          y: 148
+        positionAbsolute:
+          x: 342
+          y: 148
+        selected: false
+        type: custom
+        width: 242
+      - data:
+          cases:
+            - case_id: case_analyze
+              conditions:
+                - comparison_operator: is
+                  value: analyze
+                  variable_selector:
+                    - start
+                    - action
+              logical_operator: and
+            - case_id: case_summarize
+              conditions:
+                - comparison_operator: is
+                  value: summarize
+                  variable_selector:
+                    - start
+                    - action
+              logical_operator: and
+          desc: Route berdasarkan input action (default = suggest)
+          selected: false
+          title: Branch by Action
+          type: if-else
+        height: 215
+        id: branch
+        position:
+          x: 684
+          y: 107
+        positionAbsolute:
+          x: 684
+          y: 107
+        type: custom
+        width: 242
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: Analisis mendalam KPI underperform
+          model:
+            completion_params:
+              max_tokens: 4096
+              temperature: 0.4
+              top_p: 0.9
+            mode: chat
+            name: qwen-max
+            provider: langgenius/tongyi/tongyi
+          prompt_template:
+            - id: 977ad7ca-7b7e-4d43-9d3b-bad97b8f6f1c
+              role: system
+              text: "Anda adalah seorang \"Chief Performance Officer\" dan Analis Strategi Perusahaan yang tajam.\nTugas Anda adalah membedah laporan pencapaian KPI (Key Performance Indicator) dari departemen spesifik.\n\nInstruksi Analisis:\n1. Temukan KPI yang berada di bawah target (underperform).\n2. Jangan hanya membaca angka; berikan opini analitis MENGAPA target tersebut bisa meleset.\n3. WAJIB mengkorelasikan pencapaian yang meleset ini dengan \"Data Makro Ekonomi\" (seperti pelemahan Kurs, inflasi, atau harga komoditas) jika dirasa ada kolerasinya secara logika bisnis.\n4. Tulis laporan dengan gaya naratif formal, profesional, dan berbasis data.\n5. Gunakan format Markdown (Bullet points & Bold) agar mudah dibaca."
+            - id: 745e8ee9-a96a-4b03-83e6-d8adfc757b23
+              role: user
+              text: "Tolong buatkan analisis performa mendalam untuk departemen dan periode berikut:\n\nDepartemen: {{#start.dept_name#}}\nPeriode: {{#start.period#}}\n\n[DATA PENCAPAIAN KPI]:\n{{#start.kpi_data#}}\n\n[DATA MAKRO EKONOMI & PASAR]:\n{{#start.external_data#}}\n\nKonteks Tambahan Knowledge Base:\n{{#knowledge.result#}}\n\nBerikan hasil Analisis Anda secara komprehensif sekarang."
+          selected: true
+          title: LLM Analyze
+          type: llm
+          vision:
+            enabled: false
+        height: 115
+        id: llm_analyze
+        position:
+          x: 1046
+          y: 0
+        positionAbsolute:
+          x: 1046
+          y: 0
+        selected: true
+        type: custom
+        width: 242
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: Executive summary ringkas untuk Direksi
+          model:
+            completion_params:
+              max_tokens: 2048
+              temperature: 0.3
+              top_p: 0.9
+            mode: chat
+            name: qwen-max
+            provider: langgenius/tongyi/tongyi
+          prompt_template:
+            - id: bfc9d5b4-eb16-4b66-865f-143f8af8373f
+              role: system
+              text: "Anda adalah \"Executive Assistant\" untuk Jajaran Eksekutif/Direksi (BOD).\nTugas Anda adalah merangkum ribuan baris data dan metrik menjadi satu \"Executive Summary\" yang sangat padat dan langsung pada intinya (to the point).\n\nInstruksi Ringkasan:\n1. Awali dengan satu paragraf kesimpulan utama mengenai status kesehatan departemen tersebut bulan ini.\n2. Highlight 1-2 pencapaian paling cemerlang (Top Performers).\n3. Highlight 1-2 kegagalan paling kritis (Critical Misses).\n4. Sebutkan secara singkat jika ada \"Faktor Eksternal/Makro\" yang mengganggu bulan ini.\n5. Panjang maksimal: 3 atau 4 paragraf pendek.\n6. Nada bicara: Lugas, objektif, tanpa basa-basi."
+            - id: 40d818bb-6c56-4fbd-b357-7b9e30541739
+              role: user
+              text: "Buatkan Executive Summary singkat untuk disajikan kepada Direksi.\n\nDepartemen: {{#start.dept_name#}}\nPeriode: {{#start.period#}}\n\nData Pencapaian:\n{{#start.kpi_data#}}\n\nKondisi Pasar Bulan ini:\n{{#start.external_data#}}\n\nKonteks Knowledge Base:\n{{#knowledge.result#}}\n\nTuliskan Ringkasan Eksekutif-nya."
+          selected: false
+          title: LLM Summarize
+          type: llm
+          vision:
+            enabled: false
+        height: 131
+        id: llm_summarize
+        position:
+          x: 1046
+          y: 195
+        positionAbsolute:
+          x: 1046
+          y: 195
+        selected: false
+        type: custom
+        width: 242
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: Rekomendasi improvement actionable per KPI
+          model:
+            completion_params:
+              max_tokens: 4096
+              temperature: 0.5
+              top_p: 0.9
+            mode: chat
+            name: qwen-max
+            provider: langgenius/tongyi/tongyi
+          prompt_template:
+            - role: system
+              text: "Anda adalah \"Konsultan Manajemen Operasional\" dari firma konsultan terkemuka (Tier-1).\nFokus Anda bukan melaporkan masa lalu, melainkan merekomendasikan TINDAKAN (Action Plan) ke masa depan.\n\nInstruksi Rekomendasi:\n1. Amati KPI mana saja yang skor / achievement rate-nya paling membahayakan.\n2. Berikan 3 hingga 5 rekomendasi tindakan perbaikan (Actionable Improvements).\n3. Setiap rekomendasi harus bersifat sangat spesifik (bukan sekadar \"Tingkatkan kerjasama tim\").\n4. Bila kebetulan harga bahan baku dunia naik atau kurs IDR sedang hancur menurut \"Data Makro\", sarankan strategi lindung nilai (hedging) atau efisiensi spesifik.\n5. Gunakan format tabel atau poin bernomor yang tegas."
+            - role: user
+              text: "Sebagai Konsultan, apa yang harus dilakukan manajer departemen ini bulan depan untuk memperbaiki keadaannya?\n\nTim/Departemen: {{#start.dept_name#}}\nBulan Evaluasi: {{#start.period#}}\n\nRapor Data Bulanan:\n{{#start.kpi_data#}}\n\nTekanan/Anomali Makro:\n{{#start.external_data#}}\n\nKonteks Knowledge Base:\n{{#knowledge.result#}}\n\nSusun rencana tindakan (Action Plan) Anda untuk mereka."
+          selected: false
+          title: LLM Suggest
+          type: llm
+          vision:
+            enabled: false
+        height: 131
+        id: llm_suggest
+        position:
+          x: 1046
+          y: 406
+        positionAbsolute:
+          x: 1046
+          y: 406
+        type: custom
+        width: 242
+      - data:
+          outputs:
+            - value_selector:
+                - llm_summarize
+                - text
+              value_type: string
+              variable: result
+          selected: false
+          title: End
+          type: end
+        height: 88
+        id: end_node
+        position:
+          x: 1388
+          y: 217
+        positionAbsolute:
+          x: 1388
+          y: 217
+        selected: false
+        type: custom
+        width: 242
+      - data:
+          outputs:
+            - value_selector:
+                - llm_analyze
+                - text
+              value_type: string
+              variable: text
+          selected: false
+          title: Output 2
+          type: end
+        height: 88
+        id: "1772898299563"
+        position:
+          x: 1388
+          y: 14
+        positionAbsolute:
+          x: 1388
+          y: 14
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 242
+      - data:
+          outputs:
+            - value_selector:
+                - llm_suggest
+                - text
+              value_type: string
+              variable: text
+          selected: false
+          title: Output 3
+          type: end
+        height: 88
+        id: "1772898321116"
+        position:
+          x: 1388
+          y: 428
+        positionAbsolute:
+          x: 1388
+          y: 428
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 242
+    viewport:
+      x: -119.97696776028306
+      y: 148.07496455685288
+      zoom: 0.6929048913908998
+  rag_pipeline_variables: []

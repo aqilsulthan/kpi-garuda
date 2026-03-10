@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #1E3A5F;
+    --accent:  #2E86C1;
+  }
+  body { @apply font-sans; }
+}
+
+@layer components {
+  /* Legacy Utilities mapped to premium look */
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-sm transition-all focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98];
+  }
+  .btn-secondary {
+    @apply bg-white hover:bg-gray-50 text-gray-700 border border-gray-200/60 font-medium px-4 py-2.5 rounded-xl shadow-sm transition-all focus:ring-2 focus:ring-gray-200 focus:ring-offset-1 active:scale-[0.98];
+  }
+  .btn-success {
+    @apply bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-sm transition-all focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 active:scale-[0.98];
+  }
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-sm transition-all focus:ring-2 focus:ring-red-500 focus:ring-offset-1 active:scale-[0.98];
+  }
+  .card {
+    @apply bg-white rounded-2xl border border-gray-200/60 shadow-sm hover:shadow-md transition-shadow duration-300;
+  }
+  .input {
+    @apply w-full border border-gray-200 bg-white rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all shadow-sm;
+  }
+  .label {
+    @apply block text-[13px] font-medium text-gray-700 mb-1.5;
+  }
+  .badge-green  { @apply inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200/60 uppercase; }
+  .badge-yellow { @apply inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-amber-50 text-amber-700 border border-amber-200/60 uppercase; }
+  .badge-red    { @apply inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-red-50 text-red-700 border border-red-200/60 uppercase; }
+  .badge-blue   { @apply inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-blue-50 text-blue-700 border border-blue-200/60 uppercase; }
+  .badge-gray   { @apply inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-gray-100 text-gray-700 border border-gray-200/60 uppercase; }
+}
