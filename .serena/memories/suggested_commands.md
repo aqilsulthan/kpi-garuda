@@ -1,0 +1,8 @@
+- Dev Server: `npm run dev`
+- Build: `npm run build`
+- Start Prod: `npm start`
+- Lint: `npm run lint`
+- Database scripts: 
+  - `npm run db:migrate:pg` (uses `tsx scripts/migrate_pg.ts`)
+  - `npm run db:seed:pg` (uses `tsx scripts/seed_pg.ts`)
+- System commands: Use WSL (`wsl -d Ubuntu bash -c "..."`) or Powershell for typical Linux utilities if required. The `wsl` command prefix is handled by Serena MCP automatically.

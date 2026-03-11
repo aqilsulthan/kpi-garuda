@@ -87,8 +87,7 @@ export default function UploadExcelForm({ departments }: { departments: Departme
       if (res.ok) {
         const actualsMsg = data.actualsInserted > 0 ? ` dan ${data.actualsInserted} data aktual` : ''
         setMessage({ type: 'success', text: `Berhasil menyimpan ${data.inserted} KPI item${actualsMsg} untuk periode ${period}.` })
-        setParseResult(null)
-        setFile(null)
+        setTimeout(() => window.location.reload(), 1500)
       } else {
         setMessage({ type: 'error', text: data.error ?? 'Gagal menyimpan.' })
       }

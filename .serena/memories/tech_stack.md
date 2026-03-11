@@ -1,0 +1,11 @@
+- Frontend + Backend: Next.js 14 (App Router) + TypeScript
+- Authentication: NextAuth.js v5 (Session JWT, role-based)
+- Database: PostgreSQL (accessed via `postgres` package)
+- AI Platform: Dify Enterprise 1.11.8 (Self-hosted)
+- LLM: Qwen
+- Excel Parser: SheetJS (`xlsx`)
+- Styling: Tailwind CSS, `clsx`, `tailwind-merge`
+- Charts: Recharts
+- Schema Validation: `zod`
+- Icons: `lucide-react`
+- Package Manager: `npm`

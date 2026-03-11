@@ -1,8 +1,10 @@
 {
-  "/admin/upload/page": "app/admin/upload/page.js",
-  "/admin/kpi-list/page": "app/admin/kpi-list/page.js",
-  "/planning/[period]/page": "app/planning/[period]/page.js",
   "/board/page": "app/board/page.js",
-  "/api/db-migrate/route": "app/api/db-migrate/route.js",
-  "/board/[period]/page": "app/board/[period]/page.js"
+  "/planning/[period]/page": "app/planning/[period]/page.js",
+  "/login/page": "app/login/page.js",
+  "/board/[period]/page": "app/board/[period]/page.js",
+  "/chat/page": "app/chat/page.js",
+  "/api/chat/history/route": "app/api/chat/history/route.js",
+  "/api/dify/route": "app/api/dify/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js"
 }

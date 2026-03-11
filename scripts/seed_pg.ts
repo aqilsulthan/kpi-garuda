@@ -43,11 +43,13 @@ async function main() {
         const [userCount] = await sql`SELECT COUNT(*) FROM users`;
         const [deptCount] = await sql`SELECT COUNT(*) FROM departments`;
         const [dictCount] = await sql`SELECT COUNT(*) FROM kpi_dictionary`;
+        const [chatCount] = await sql`SELECT COUNT(*) FROM chat_messages`;
 
         console.log('📊 Ringkasan Data:');
         console.log(`   Users       : ${userCount.count}`);
         console.log(`   Departments : ${deptCount.count}`);
         console.log(`   KPI Dict    : ${dictCount.count}`);
+        console.log(`   Chat History: ${chatCount.count}`);
         console.log('\n⚠️  PENTING: Ganti password admin setelah login pertama!');
         console.log('   Login: admin@company.com / admin123');
         console.log('\n👉 Jalankan berikutnya: npm run dev');

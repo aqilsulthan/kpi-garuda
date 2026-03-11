@@ -107,7 +107,7 @@ export default function BoardReport({
       </div>
 
       {/* Content */}
-      <div className={`flex-1 flex flex-col overflow-y-auto lg:overflow-hidden bg-[#F8FAFC] ${!showMobileList ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`flex-1 flex flex-col overflow-y-auto lg:overflow-hidden bg-[#F8FAFC] print:block print:h-auto print:overflow-visible print:bg-white ${!showMobileList ? 'flex' : 'hidden md:flex'}`}>
         {selected ? (
           <>
             {/* Header */}

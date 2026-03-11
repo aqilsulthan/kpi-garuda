@@ -66,6 +66,7 @@ export default function PlanningWorkspace({ period, scorecards, externalData, us
         })
       })
       if (res.ok) {
+        alert('Berhasil dihapus.')
         window.location.reload()
       } else {
         const data = await res.json()
@@ -121,7 +122,12 @@ export default function PlanningWorkspace({ period, scorecards, externalData, us
         }),
       })
       const data = await res.json()
-      setPublishMsg(data.ok ? '✅ Laporan berhasil dikirim ke Direksi.' : `❌ ${data.error}`)
+      if (data.ok) {
+        setPublishMsg('✅ Laporan berhasil dikirim ke Direksi.')
+        setTimeout(() => window.location.reload(), 1500)
+      } else {
+        setPublishMsg(`❌ ${data.error}`)
+      }
     } catch {
       setPublishMsg('❌ Gagal mengirim laporan.')
     } finally {
@@ -442,12 +448,19 @@ export default function PlanningWorkspace({ period, scorecards, externalData, us
                         <p className="text-xs text-primary-600/70 mt-1">Dify Enterprise Agent sedang bekerja</p>
                       </div>
                     )}
-                    <textarea
-                      className="w-full h-full p-5 resize-none border-none outline-none text-sm font-sans leading-relaxed text-gray-700 placeholder:text-gray-300 focus:bg-primary-50/10 transition-colors"
-                      placeholder="Hasil laporan AI akan tampil di sini. Anda dapat mengedit teks ini secara manual sebelum dikirim ke Direksi..."
-                      value={aiContent}
-                      onChange={e => setAiContent(e.target.value)}
-                    />
+                    {aiContent ? (
+                      <div
+                        className="w-full h-full p-5 overflow-y-auto outline-none text-sm font-sans leading-relaxed text-gray-700 focus:bg-primary-50/10 transition-colors prose prose-sm max-w-none"
+                        contentEditable={!generating}
+                        suppressContentEditableWarning={true}
+                        onBlur={e => setAiContent(e.currentTarget.innerHTML)}
+                        dangerouslySetInnerHTML={{ __html: aiContent }}
+                      />
+                    ) : (
+                      <div className="w-full h-full p-5 text-sm font-sans leading-relaxed text-gray-400 italic">
+                        Hasil laporan AI akan tampil di sini. Anda dapat mengedit teks ini secara manual sebelum dikirim ke Direksi...
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -476,6 +489,18 @@ export default function PlanningWorkspace({ period, scorecards, externalData, us
                         </div>
                       </div>
                     ))}
+                    {chatting && (
+                        <div className="flex justify-start">
+                             <div className="px-4 py-2.5 rounded-2xl max-w-[85%] text-[13px] leading-relaxed shadow-sm bg-gray-50 border border-gray-100 text-gray-500 italic rounded-bl-sm flex items-center gap-2">
+                                <span className="flex items-center gap-1.5 opacity-70">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                </span>
+                                <span>Memproses jawaban...</span>
+                            </div>
+                        </div>
+                    )}
                     <div ref={chatEndRef} />
                   </div>
 

@@ -152,8 +152,8 @@ export default function AppShell({ children, user, period }: Props) {
       </aside>
 
       {/* Main content - add subtle fade-in animation base class */}
-      <main className="flex-1 overflow-auto bg-[#F8FAFC] dark:bg-gray-950 pt-[60px] md:pt-0 flex flex-col print:bg-white print:overflow-visible print:pt-0">
-        <div className="h-full animate-fade-in text-gray-900 dark:text-gray-100">
+      <main className="flex-1 overflow-auto bg-[#F8FAFC] dark:bg-gray-950 pt-[60px] md:pt-0 flex flex-col print:bg-white print:overflow-visible print:pt-0 print:block">
+        <div className="h-full print:h-auto print:block animate-fade-in text-gray-900 dark:text-gray-100">
           {children}
         </div>
       </main>

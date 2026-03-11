@@ -39,3 +39,20 @@
   .badge-blue   { @apply inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-blue-50 text-blue-700 border border-blue-200/60 uppercase; }
   .badge-gray   { @apply inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-gray-100 text-gray-700 border border-gray-200/60 uppercase; }
 }
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5); /* Tailwind gray-400 equivalent */
+    border-radius: 20px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(107, 114, 128, 0.8); /* Tailwind gray-500 equivalent */
+  }
+}

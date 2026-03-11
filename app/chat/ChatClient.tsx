@@ -18,24 +18,54 @@ export default function ChatClient({ user }: ChatClientProps) {
     const [chatLog, setChatLog] = useState<{ role: 'ai' | 'user', text: string }[]>([])
     const [chatting, setChatting] = useState(false)
     const [convId, setConvId] = useState<string | null>(null)
+    const [allMessages, setAllMessages] = useState<any[]>([])
+    const [historyGroups, setHistoryGroups] = useState<{ id: string, title: string }[]>([])
     const chatEndRef = useRef<HTMLDivElement>(null)
+
+    const fetchHistory = () => {
+        fetch('/api/chat/history')
+            .then(res => res.json())
+            .then(data => {
+                if (data.messages && data.messages.length > 0) {
+                    setAllMessages(data.messages)
+                    const groups: Record<string, string> = {}
+                    data.messages.forEach((m: any) => {
+                        if (m.conversation_id && !groups[m.conversation_id] && m.role === 'user') {
+                            groups[m.conversation_id] = m.content.substring(0, 30) + (m.content.length > 30 ? '...' : '')
+                        }
+                    })
+                    const groupList = Object.keys(groups).map(k => ({ id: k, title: groups[k] })).reverse()
+                    setHistoryGroups(groupList)
+                    return data.messages
+                }
+                return []
+            })
+            .catch(err => console.error("Gagal load history:", err))
+    }
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [chatLog])
 
     useEffect(() => {
-        // Load history dari DB
+        // Load initial history
         fetch('/api/chat/history')
             .then(res => res.json())
             .then(data => {
                 if (data.messages && data.messages.length > 0) {
-                    // Ambil conv_id terakhir
+                    setAllMessages(data.messages)
+                    const groups: Record<string, string> = {}
+                    data.messages.forEach((m: any) => {
+                        if (m.conversation_id && !groups[m.conversation_id] && m.role === 'user') {
+                            groups[m.conversation_id] = m.content.substring(0, 30) + (m.content.length > 30 ? '...' : '')
+                        }
+                    })
+                    const groupList = Object.keys(groups).map(k => ({ id: k, title: groups[k] })).reverse()
+                    setHistoryGroups(groupList)
+
                     const lastMsg = data.messages[data.messages.length - 1]
                     if (lastMsg.conversation_id) {
                         setConvId(lastMsg.conversation_id)
-                        
-                        // Load semua message dari convId terakhir
                         const currentConvMessages = data.messages
                             .filter((m: any) => m.conversation_id === lastMsg.conversation_id)
                             .map((m: any) => ({
@@ -48,6 +78,23 @@ export default function ChatClient({ user }: ChatClientProps) {
             })
             .catch(err => console.error("Gagal load history:", err))
     }, [])
+
+    function loadConversation(id: string) {
+        setConvId(id)
+        if (!allMessages) return
+        const currentConvMessages = allMessages
+            .filter((m: any) => m.conversation_id === id)
+            .map((m: any) => ({
+                role: m.role as 'ai'|'user',
+                text: m.content
+            }))
+        setChatLog(currentConvMessages)
+    }
+
+    function startNewChat() {
+        setConvId(null)
+        setChatLog([])
+    }
 
     async function handleChat(overrideQuery?: string) {
         const q = overrideQuery || chatInput.trim()
@@ -75,6 +122,9 @@ export default function ChatClient({ user }: ChatClientProps) {
             const data = await res.json()
             setChatLog(l => [...l, { role: 'ai', text: data.answer ?? '...' }])
             if (data.conversation_id) setConvId(data.conversation_id)
+            
+            // Refresh history list silently
+            fetchHistory()
         } catch {
             setChatLog(l => [...l, { role: 'ai', text: '❌ Koneksi ke AI gagal.' }])
         } finally {
@@ -104,9 +154,32 @@ export default function ChatClient({ user }: ChatClientProps) {
                             <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Asisten pintar untuk data KPI Perusahaan Anda.</p>
                         </div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => { setChatLog([]); setConvId(null) }} className="dark:border-gray-700 dark:text-gray-300">
+                    <Button variant="outline" size="sm" onClick={startNewChat} className="dark:border-gray-700 dark:text-gray-300">
                         <RefreshCw size={14} className="mr-2" /> Topik Baru (Reset)
                     </Button>
+                </div>
+
+                {/* History Bar */}
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 overflow-x-auto whitespace-nowrap bg-white dark:bg-gray-900 scrollbar-thin">
+                    <Button variant={!convId ? 'primary' : 'outline'} size="sm" onClick={startNewChat} className="flex-shrink-0">
+                        <MessageSquare size={14} className="mr-2" /> New Chat
+                    </Button>
+                    <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-2 flex-shrink-0" />
+                    <span className="text-xs font-medium text-gray-400 mr-1 flex-shrink-0">Riwayat:</span>
+                    {historyGroups.length === 0 && (
+                        <span className="text-xs text-gray-400 italic flex-shrink-0 bg-gray-50 px-2 py-1 rounded">Mulai chat untuk menyimpan riwayat.</span>
+                    )}
+                    {historyGroups.map(g => (
+                        <Button 
+                            key={g.id} 
+                            variant={convId === g.id ? 'secondary' : 'ghost'} 
+                            size="sm" 
+                            onClick={() => loadConversation(g.id)}
+                            className="flex-shrink-0 text-xs text-gray-600 dark:text-gray-300 px-3 h-8 font-normal truncate max-w-[150px] border border-transparent hover:border-gray-200"
+                        >
+                            {g.title}
+                        </Button>
+                    ))}
                 </div>
 
                 {/* Chat Area */}
@@ -155,6 +228,21 @@ export default function ChatClient({ user }: ChatClientProps) {
                             </div>
                         </div>
                     ))}
+                    {chatting && (
+                        <div className="flex justify-start">
+                            <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 flex items-center justify-center flex-shrink-0 mr-3 mt-1">
+                                <Bot size={14} />
+                            </div>
+                            <div className="px-5 py-3.5 rounded-2xl max-w-[85%] text-sm leading-relaxed shadow-sm bg-white dark:bg-gray-800 border border-gray-200/60 dark:border-gray-700 text-gray-500 italic rounded-bl-sm flex items-center gap-2">
+                                <span className="flex items-center gap-1.5 opacity-70">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                </span>
+                                <span>Sedang memproses jawaban...</span>
+                            </div>
+                        </div>
+                    )}
                     <div ref={chatEndRef} />
                 </div>
 

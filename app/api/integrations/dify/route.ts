@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import sql from '@/lib/db'
 import { runKpiAnalyst, sendChatMessage } from '@/lib/dify'
 import { gatherExternalMacroData } from '@/lib/external'
+import { getAllScorecards } from '@/lib/calc'
 import type { DifyAction, Role } from '@/types'
 
 export async function POST(req: NextRequest) {
@@ -49,9 +50,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'query wajib diisi.' }, { status: 400 })
     }
 
-    // Untuk memastikan Chatflow juga mendapat insight data makro aktual (Jika konteksnya membawa data itu)
-    if (context && context.external_data) {
-      // Asumsi client sudah kirim nama periode, jika tidak kita skip pembaruan live
+    // Jika ini general chat (dari BOD /chat dashboard), kita suntikkan performa KPI L1 beserta Makro Ekonomi otomatis.
+    if (context && context.general_chat) {
+      let periodParam = body.period || context.period;
+      if (!periodParam) {
+        const rows = await sql`SELECT MAX(period) as p FROM kpi_items`;
+        periodParam = rows[0]?.p;
+      }
+
+      if (periodParam) {
+        const allScores = await getAllScorecards(periodParam);
+        const l1Scores = allScores.filter(s => s.level === 'L1');
+
+        context.kpi_summary = {
+          period: periodParam,
+          level: 'Corporate (L1)',
+          departments: l1Scores.length > 0 ? l1Scores : 'Tidak ada data L1 ditemukan',
+        };
+        context.external_data = await gatherExternalMacroData(periodParam, session.user.id);
+        context.info = `Data L1 Corporate (seluruh perusahaan) & makro ekonomi untuk periode ${periodParam} telah disisipkan. JANGAN asumsikan data sendiri, JAWAB berdasarkan context JSON.`;
+      }
+    } else if (context && context.external_data) {
+      // Untuk memastikan Chatflow mendapat insight data makro aktual
       const periodParam = body.period || context.period;
       if (periodParam) {
         context.external_data = await gatherExternalMacroData(periodParam, session.user.id);
