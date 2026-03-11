@@ -23,7 +23,7 @@ export default function ChatClient({ user }: ChatClientProps) {
     const chatEndRef = useRef<HTMLDivElement>(null)
 
     const fetchHistory = () => {
-        fetch('/api/chat/history')
+        fetch('/api/chats/history')
             .then(res => res.json())
             .then(data => {
                 if (data.messages && data.messages.length > 0) {
@@ -49,7 +49,7 @@ export default function ChatClient({ user }: ChatClientProps) {
 
     useEffect(() => {
         // Load initial history
-        fetch('/api/chat/history')
+        fetch('/api/chats/history')
             .then(res => res.json())
             .then(data => {
                 if (data.messages && data.messages.length > 0) {
@@ -105,7 +105,7 @@ export default function ChatClient({ user }: ChatClientProps) {
         setChatting(true)
 
         try {
-            const res = await fetch('/api/dify', {
+            const res = await fetch('/api/integrations/dify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

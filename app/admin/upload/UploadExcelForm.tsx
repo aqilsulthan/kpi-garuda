@@ -72,7 +72,7 @@ export default function UploadExcelForm({ departments }: { departments: Departme
     setMessage(null)
 
     try {
-      const res = await fetch('/api/parse-excel', {
+      const res = await fetch('/api/kpis/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

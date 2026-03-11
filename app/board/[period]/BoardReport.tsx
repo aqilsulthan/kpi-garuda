@@ -34,7 +34,7 @@ export default function BoardReport({
     setChatting(true)
 
     try {
-      const res = await fetch('/api/dify', {
+      const res = await fetch('/api/integrations/dify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

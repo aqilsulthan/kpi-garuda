@@ -39,7 +39,7 @@ export default function DeleteKpiForm({ departments }: { departments: Department
         setMessage(null)
 
         try {
-            const res = await fetch('/api/kpi/period', {
+            const res = await fetch('/api/kpis/periods', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ entity_type: entityType, dept_id: deptId, period })

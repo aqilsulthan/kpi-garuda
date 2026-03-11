@@ -41,7 +41,7 @@ export default function MacroEconomicsWidget({ period, initialData }: Props) {
         setLoading(true)
 
         try {
-            const res = await fetch('/api/external-data', {
+            const res = await fetch('/api/integrations/external-data', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -76,7 +76,7 @@ export default function MacroEconomicsWidget({ period, initialData }: Props) {
         try {
             const dataTypeKey = newType.toLowerCase().replace(/\s+/g, '_')
 
-            const res = await fetch('/api/external-data', {
+            const res = await fetch('/api/integrations/external-data', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

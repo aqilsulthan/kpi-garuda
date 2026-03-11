@@ -56,7 +56,7 @@ export default function PlanningWorkspace({ period, scorecards, externalData, us
 
     setDeletingId(sc.dept_id)
     try {
-      const res = await fetch('/api/kpi/period', {
+      const res = await fetch('/api/kpis/periods', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -83,7 +83,7 @@ export default function PlanningWorkspace({ period, scorecards, externalData, us
     if (!selectedDept) return
     setGenerating(true)
     try {
-      const res = await fetch('/api/dify', {
+      const res = await fetch('/api/integrations/dify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -110,7 +110,7 @@ export default function PlanningWorkspace({ period, scorecards, externalData, us
     setPublishing(true)
     setPublishMsg('')
     try {
-      const res = await fetch('/api/analysis', {
+      const res = await fetch('/api/analytics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -143,7 +143,7 @@ export default function PlanningWorkspace({ period, scorecards, externalData, us
     setChatting(true)
 
     try {
-      const res = await fetch('/api/dify', {
+      const res = await fetch('/api/integrations/dify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

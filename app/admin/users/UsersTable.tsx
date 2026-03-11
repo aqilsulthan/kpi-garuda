@@ -16,7 +16,7 @@ export function UsersTable({ initialUsers }: { initialUsers: User[] }) {
             const newRole = updates.role !== undefined ? updates.role : userToUpdate.role
             const newActive = updates.is_active !== undefined ? updates.is_active : userToUpdate.is_active
 
-            const res = await fetch('/api/admin/users', {
+            const res = await fetch('/api/users', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id, role: newRole, is_active: newActive })

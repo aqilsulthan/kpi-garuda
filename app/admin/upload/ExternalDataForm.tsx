@@ -29,7 +29,7 @@ export default function ExternalDataForm() {
     setFetching(true)
     setFetchLog([])
     try {
-      const res = await fetch('/api/external-data/fetch')
+      const res = await fetch('/api/integrations/external-data/fetch')
       const data = await res.json()
       const log: string[] = []
 
@@ -70,7 +70,7 @@ export default function ExternalDataForm() {
     ].filter(e => e.value !== '')
 
     try {
-      const res = await fetch('/api/external-data', {
+      const res = await fetch('/api/integrations/external-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ period, entries, notes: fields.notes }),
