@@ -8,10 +8,10 @@ Sistem manajemen KPI berbasis AI yang membantu tim Corporate Planning menghasilk
 ## Arsitektur
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  NEXT.JS (App Router)               │
-│  /admin/upload   /planning/[period]   /board/[period]│
-│         ↕ API Routes (6 endpoints)                  │
+┌─────────────────────────────────────────────────────────────┐
+│                       NEXT.JS (App Router)                  │
+│  /admin/upload  /admin/kpi-list  /planning/[p]  /board/[p]  │
+│              ↕ API Routes (6 endpoints)                     │
 └──────────────────┬──────────────────────────────────┘
                    │
        ┌───────────┴────────────┐
@@ -57,7 +57,10 @@ Sistem manajemen KPI berbasis AI yang membantu tim Corporate Planning menghasilk
 kpi-system/
 ├── app/
 │   ├── login/                    # Halaman login
-│   ├── admin/upload/             # Upload Excel + data eksternal
+│   ├── admin/
+│   │   ├── upload/               # Upload Excel + data eksternal
+│   │   ├── kpi-list/             # List & manage uploaded KPI per period
+│   │   └── users/                # Kelola user
 │   ├── planning/
 │   │   ├── page.tsx              # List periode
 │   │   └── [period]/             # Workspace Corporate Planning
@@ -311,6 +314,11 @@ npm start
 4. **Bagian 3 — Update Knowledge Base Dify:**
    - Klik link **Buka Dify Enterprise → Knowledge Base**
    - Upload dokumen terbaru (laporan riset, data industri, dll)
+
+5. **Bagian 4 — Kelola & Hapus Data KPI:**
+   - Ke menu **List Data KPI** (`/admin/kpi-list`)
+   - Lihat semua file KPI yang terupload dan di-grouping per periode.
+   - Pilihan "Hapus": bisa menghapus keseluruhan data sistem (Reset), per periode, atau per departemen/unit spesifik.
 
 #### Format Excel yang Diterima
 

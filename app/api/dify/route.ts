@@ -2,6 +2,7 @@
 // Menangani workflow (kpi-analyst) dan chatflow (kpi-assistant)
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import sql from '@/lib/db'
 import { runKpiAnalyst, sendChatMessage } from '@/lib/dify'
 import { gatherExternalMacroData } from '@/lib/external'
 import type { DifyAction, Role } from '@/types'
@@ -30,7 +31,8 @@ export async function POST(req: NextRequest) {
       dept_name,
       period,
       kpi_data ?? [],
-      freshExternalData as any
+      freshExternalData as any,
+      session.user.role
     )
 
     if (result.error) {
@@ -63,9 +65,23 @@ export async function POST(req: NextRequest) {
       context ?? {}
     )
 
+    const finalConvId = result.conversation_id || conversation_id || 'unknown'
+
+    // Simpan history ke database
+    try {
+      await sql`
+        INSERT INTO chat_messages (user_id, role, content, conversation_id)
+        VALUES 
+          (${session.user.id}, 'user', ${query}, ${finalConvId}),
+          (${session.user.id}, 'ai', ${result.answer}, ${finalConvId})
+      `
+    } catch (dbErr) {
+      console.error('Gagal menyimpan chat history:', dbErr)
+    }
+
     return NextResponse.json({
       answer: result.answer,
-      conversation_id: result.conversation_id,
+      conversation_id: finalConvId,
     })
   }
 

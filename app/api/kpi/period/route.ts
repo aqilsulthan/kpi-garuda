@@ -17,7 +17,9 @@ export async function DELETE(req: NextRequest) {
 
         let deletedRows: any[] = []
 
-        if (dept_id === 'ALL') {
+        if (period === 'ALL' && dept_id === 'ALL' && entity_type === 'ALL') {
+             deletedRows = await sql`DELETE FROM kpi_items RETURNING id`
+        } else if (dept_id === 'ALL') {
             if (entity_type === 'ALL') {
                 deletedRows = await sql`
           DELETE FROM kpi_items WHERE period = ${period} RETURNING id

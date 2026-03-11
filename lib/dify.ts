@@ -4,10 +4,10 @@ import type {
   KpiWithActual, ExternalData, Role
 } from '@/types'
 
-const DIFY_BASE = process.env.DIFY_BASE_URL!
-const WORKFLOW_KEY = process.env.DIFY_WORKFLOW_API_KEY!
-const CHATFLOW_KEY = process.env.DIFY_CHATFLOW_API_KEY!
-const EXECUTIVE_AGENT_KEY = process.env.DIFY_EXECUTIVE_AGENT_API_KEY!
+const getDifyBase = () => process.env.DIFY_BASE_URL! || 'http://localhost'
+const getWorkflowKey = () => process.env.DIFY_WORKFLOW_API_KEY!
+const getChatflowKey = () => process.env.DIFY_CHATFLOW_API_KEY!
+const getExecutiveKey = () => process.env.DIFY_EXECUTIVE_AGENT_API_KEY!
 
 // ─── Workflow: kpi-analyst ────────────────────────────────────
 // 3 action dalam 1 workflow: analyze | summarize | suggest
@@ -16,26 +16,28 @@ export async function runKpiAnalyst(
   deptName: string,
   period: string,
   kpiData: KpiWithActual[],
-  externalData: ExternalData[]
+  externalData: ExternalData[],
+  userRole: string
 ): Promise<DifyWorkflowResponse> {
   try {
-    const url = `${DIFY_BASE.replace(/\/v1\/?$/, '')}/v1/workflows/run`
+    const url = `${getDifyBase().replace(/\/v1\/?$/, '')}/v1/workflows/run`
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${WORKFLOW_KEY}`,
+        'Authorization': `Bearer ${getWorkflowKey()}`,
       },
       body: JSON.stringify({
         inputs: {
-          action,
+          action: action,
           dept_name: deptName,
-          period,
+          period: period,
           kpi_data: JSON.stringify(kpiData),
           external_data: JSON.stringify(externalData),
+          role: userRole
         },
         response_mode: 'blocking',
-        user: 'corporate_planning',
+        user: userRole,
       }),
     })
 
@@ -70,10 +72,17 @@ export async function sendChatMessage(
     // Dify Agent Apps require 'streaming' response mode, while standard Chatflows may support 'blocking'.
     const responseMode = mappedRole === 'direksi' ? 'streaming' : 'blocking'
 
+    const deptNameStr = (context as any)?.kpi_summary?.unit_name || (context as any)?.kpi_summary?.dept_name || (context as any)?.dept || 'Corporate'
+
+    // Tambahkan instruksi ketat di belakang query pengguna secara tersembunyi
+    const strictInstruction = `\n\n[INSTRUKSI SISTEM: Jawab HANYA berdasarkan data di dalam 'Konteks Data (JSON)'. DILARANG KERAS mengarang angka, entitas, asumsi, atau menggunakan data di luar konteks.]`
+    const enhancedQuery = query + strictInstruction
+
     const body: Record<string, unknown> = {
-      query,
+      query: enhancedQuery,
       inputs: {
         role: mappedRole,
+        dept_name: deptNameStr,
         context: JSON.stringify(context),
       },
       response_mode: responseMode,
@@ -82,9 +91,9 @@ export async function sendChatMessage(
     if (conversationId) body.conversation_id = conversationId
 
     // Pilih API Key yang tepat berdasarkan peran
-    const apiKey = mappedRole === 'direksi' ? EXECUTIVE_AGENT_KEY : CHATFLOW_KEY
+    const apiKey = mappedRole === 'direksi' ? getExecutiveKey() : getChatflowKey()
 
-    const url = `${DIFY_BASE.replace(/\/v1\/?$/, '')}/v1/chat-messages`
+    const url = `${getDifyBase().replace(/\/v1\/?$/, '')}/v1/chat-messages`
     const res = await fetch(url, {
       method: 'POST',
       headers: {

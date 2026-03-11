@@ -102,18 +102,7 @@ export default async function AdminUploadPage() {
               </CardContent>
             </Card>
 
-            {/* Delete KPI Period */}
-            <Card className="border-red-100 bg-red-50/10">
-              <CardContent className="p-6 md:p-8">
-                <div className="mb-6">
-                  <h2 className="text-lg font-bold text-gray-900 mb-1">Hapus Data Periode Tertentu</h2>
-                  <p className="text-[13px] text-gray-500">
-                    Menghapus data akan permanen melenyapkan KPI dan Aktual pada periode yang dipilih.
-                  </p>
-                </div>
-                <DeleteKpiForm departments={departments as any} />
-              </CardContent>
-            </Card>
+
           </div>
         </div>
       </div>

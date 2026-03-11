@@ -145,8 +145,8 @@ export default function BoardReport({
                 <div className="max-w-3xl mx-auto">
                   {selected.ai_content ? (
                     <div className="prose prose-sm md:prose-base prose-gray max-w-none prose-headings:font-bold prose-headings:text-gray-900 prose-p:text-gray-700 prose-p:leading-relaxed prose-a:text-primary-600">
-                      {/* We use whitespace-pre-wrap to respect newlines from the AI */}
-                      <div className="whitespace-pre-wrap text-[15px]">{selected.ai_content}</div>
+                      {/* We use dangerouslySetInnerHTML to render HTML from the AI */}
+                      <div className="whitespace-pre-wrap text-[15px]" dangerouslySetInnerHTML={{ __html: selected.ai_content }} />
                     </div>
                   ) : (
                     <div className="text-center py-12 text-gray-400">Konten laporan tidak tersedia.</div>

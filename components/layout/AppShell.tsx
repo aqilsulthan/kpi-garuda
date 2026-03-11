@@ -19,9 +19,10 @@ const NAV: NavItem[] = [
   { href: '/admin', label: 'Dashboard System', icon: <Activity size={18} />, roles: ['admin'] },
   { href: '/planning', label: 'Dashboard KPI', icon: <Home size={18} />, roles: ['corporate_planning'] },
   { href: '/admin/upload', label: 'Upload Data', icon: <Upload size={18} />, roles: ['admin'] },
+  { href: '/admin/kpi-list', label: 'List Data KPI', icon: <Database size={18} />, roles: ['admin'] },
   { href: '/board', label: 'Laporan BOD', icon: <FileText size={18} />, roles: ['direksi', 'admin'] },
   { href: '/chat', label: 'Chatbot Executive', icon: <MessageSquare size={18} />, roles: ['direksi'] },
-  { href: '/admin/users', label: 'Kelola User', icon: <Database size={18} />, roles: ['admin'] },
+  { href: '/admin/users', label: 'Kelola User', icon: <UserCircle size={18} />, roles: ['admin'] },
 ]
 
 interface Props {

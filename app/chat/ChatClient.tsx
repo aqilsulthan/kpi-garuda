@@ -24,6 +24,31 @@ export default function ChatClient({ user }: ChatClientProps) {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [chatLog])
 
+    useEffect(() => {
+        // Load history dari DB
+        fetch('/api/chat/history')
+            .then(res => res.json())
+            .then(data => {
+                if (data.messages && data.messages.length > 0) {
+                    // Ambil conv_id terakhir
+                    const lastMsg = data.messages[data.messages.length - 1]
+                    if (lastMsg.conversation_id) {
+                        setConvId(lastMsg.conversation_id)
+                        
+                        // Load semua message dari convId terakhir
+                        const currentConvMessages = data.messages
+                            .filter((m: any) => m.conversation_id === lastMsg.conversation_id)
+                            .map((m: any) => ({
+                                role: m.role as 'ai'|'user',
+                                text: m.content
+                            }))
+                        setChatLog(currentConvMessages)
+                    }
+                }
+            })
+            .catch(err => console.error("Gagal load history:", err))
+    }, [])
+
     async function handleChat(overrideQuery?: string) {
         const q = overrideQuery || chatInput.trim()
         if (!q || chatting) return
@@ -80,7 +105,7 @@ export default function ChatClient({ user }: ChatClientProps) {
                         </div>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => { setChatLog([]); setConvId(null) }} className="dark:border-gray-700 dark:text-gray-300">
-                        <RefreshCw size={14} className="mr-2" /> Reset Chat
+                        <RefreshCw size={14} className="mr-2" /> Topik Baru (Reset)
                     </Button>
                 </div>
 

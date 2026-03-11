@@ -1,9 +1,8 @@
 app:
   description: Chatflow asisten KPI maskapai penerbangan v3. Mendukung role admin,
-    corporate_planning dan direksi. Dilengkapi Question Classifier, Parameter Extractor,
-    Query Rewriter, Code Executor kalkulasi KPI, dan LLM Validator untuk jawaban
-    berkualitas tinggi.
-  icon: 🤖
+    corporate_planning dan direksi. Arsitektur lean - 1 LLM utama, logika classifier
+    dan kalkulasi KPI dijalankan via Code node Python.
+  icon: "\U0001F916"
   icon_background: '#D1FAE5'
   mode: advanced-chat
   name: v3-web-kpi-assistant
@@ -52,8 +51,8 @@ workflow:
         - local_file
         - remote_url
       number_limits: 3
-    opening_statement: "Halo! Saya KPI Assistant v3. Saya bisa membantu Anda:\n\
-      - \U0001F4CA Menganalisis data KPI departemen\n- \U0001F4CB Membuat ringkasan\
+    opening_statement: "Halo! Saya KPI Assistant v3. Saya bisa membantu Anda:\n- \
+      \U0001F4CA Menganalisis data KPI departemen\n- \U0001F4CB Membuat ringkasan\
       \ laporan\n- \U0001F4A1 Memberikan rekomendasi improvement\n- \u2753 Menjawab\
       \ pertanyaan tentang performa KPI\n\nSilakan ajukan pertanyaan Anda."
     retriever_resource:
@@ -74,103 +73,55 @@ workflow:
       voice: ''
   graph:
     edges:
-    # ── Start → Code Executor (kalkulasi score KPI)
+    # Start → Code Preprocessor (kalkulasi KPI + klasifikasi + ekstrak param)
     - data:
         isInIteration: false
         sourceType: start
         targetType: code
-      id: start-code
+      id: start-preprocess
       source: start
       sourceHandle: source
-      target: code_kpi_calc
+      target: code_preprocessor
       targetHandle: target
       type: custom
 
-    # ── Code Executor → Question Classifier
+    # Code Preprocessor → IF/ELSE (routing berdasarkan kategori)
     - data:
         isInIteration: false
         sourceType: code
-        targetType: llm
-      id: code-classifier
-      source: code_kpi_calc
+        targetType: if-else
+      id: preprocess-ifelse
+      source: code_preprocessor
       sourceHandle: source
-      target: llm_classifier
+      target: ifelse_router
       targetHandle: target
       type: custom
 
-    # ── Question Classifier → [branch: kpi_analysis] → Parameter Extractor
+    # IF/ELSE → [true branch = kpi/admin] → Knowledge Retrieval
     - data:
         isInIteration: false
-        sourceType: llm
-        targetType: llm
-      id: classifier-extractor
-      source: llm_classifier
-      sourceHandle: kpi_analysis
-      target: llm_param_extractor
-      targetHandle: target
-      type: custom
-
-    # ── Question Classifier → [branch: out_of_scope] → Answer OOS
-    - data:
-        isInIteration: false
-        sourceType: llm
-        targetType: answer
-      id: classifier-oos
-      source: llm_classifier
-      sourceHandle: out_of_scope
-      target: answer_oos
-      targetHandle: target
-      type: custom
-
-    # ── Question Classifier → [branch: admin_technical] → LLM Admin
-    - data:
-        isInIteration: false
-        sourceType: llm
-        targetType: llm
-      id: classifier-admin
-      source: llm_classifier
-      sourceHandle: admin_technical
-      target: llm_admin
-      targetHandle: target
-      type: custom
-
-    # ── LLM Admin → Answer
-    - data:
-        isInIteration: false
-        sourceType: llm
-        targetType: answer
-      id: admin-answer
-      source: llm_admin
-      sourceHandle: source
-      target: answer
-      targetHandle: target
-      type: custom
-
-    # ── Parameter Extractor → Query Rewriter
-    - data:
-        isInIteration: false
-        sourceType: llm
-        targetType: llm
-      id: extractor-rewriter
-      source: llm_param_extractor
-      sourceHandle: source
-      target: llm_query_rewriter
-      targetHandle: target
-      type: custom
-
-    # ── Query Rewriter → Knowledge Retrieval
-    - data:
-        isInIteration: false
-        sourceType: llm
+        sourceType: if-else
         targetType: knowledge-retrieval
-      id: rewriter-knowledge
-      source: llm_query_rewriter
-      sourceHandle: source
+      id: ifelse-knowledge
+      source: ifelse_router
+      sourceHandle: 'true'
       target: knowledge
       targetHandle: target
       type: custom
 
-    # ── Knowledge Retrieval → LLM Utama
+    # IF/ELSE → [false branch = out_of_scope] → Answer OOS
+    - data:
+        isInIteration: false
+        sourceType: if-else
+        targetType: answer
+      id: ifelse-oos
+      source: ifelse_router
+      sourceHandle: 'false'
+      target: answer_oos
+      targetHandle: target
+      type: custom
+
+    # Knowledge Retrieval → LLM Utama
     - data:
         isInIteration: false
         sourceType: knowledge-retrieval
@@ -182,34 +133,22 @@ workflow:
       targetHandle: target
       type: custom
 
-    # ── LLM Utama → LLM Validator
-    - data:
-        isInIteration: false
-        sourceType: llm
-        targetType: llm
-      id: llm-validator
-      source: llm_assistant
-      sourceHandle: source
-      target: llm_validator
-      targetHandle: target
-      type: custom
-
-    # ── LLM Validator → Answer
+    # LLM Utama → Answer
     - data:
         isInIteration: false
         sourceType: llm
         targetType: answer
-      id: validator-answer
-      source: llm_validator
+      id: llm-answer
+      source: llm_assistant
       sourceHandle: source
       target: answer
       targetHandle: target
       type: custom
 
     nodes:
-    # ════════════════════════════════════════
+    # ══════════════════════════════════════════════════
     # NODE 1: START
-    # ════════════════════════════════════════
+    # ══════════════════════════════════════════════════
     - data:
         desc: ''
         selected: false
@@ -241,156 +180,211 @@ workflow:
       type: custom
       width: 242
 
-    # ════════════════════════════════════════
-    # NODE 2: CODE EXECUTOR — Kalkulasi Score KPI
-    # Menghitung score (%), status 🟢🟡🔴, dan
-    # ringkasan statistik dari JSON context.
-    # ════════════════════════════════════════
+    # ══════════════════════════════════════════════════
+    # NODE 2: CODE PREPROCESSOR
+    # Menggabungkan 3 tugas sekaligus tanpa LLM:
+    #   A) Kalkulasi score KPI + status 🟢🟡🔴
+    #   B) Klasifikasi kategori query (keyword-based)
+    #   C) Ekstraksi parameter (departemen, periode, metrik)
+    #   D) Query rewrite untuk RAG
+    # Output:
+    #   - kpi_summary      : ringkasan teks score KPI
+    #   - kpi_calculated   : JSON detail KPI + score + status
+    #   - category         : "kpi_analysis" | "admin_technical" | "out_of_scope"
+    #   - param_json       : JSON parameter teridentifikasi
+    #   - enriched_query   : query yang diperkaya untuk Knowledge Retrieval
+    #   - system_hint      : instruksi tambahan ke LLM berdasarkan kategori & role
+    # ══════════════════════════════════════════════════
     - data:
-        code: |
-          import json
-
-          def main(context: str) -> dict:
-              """
-              Kalkulasi score KPI dari JSON context.
-              Format input JSON yang didukung:
-              [{"nama": "OTP", "aktual": 85, "target": 90, "pola": "MAX"}, ...]
-              """
-              if not context or context.strip() == "":
-                  return {
-                      "kpi_summary": "Tidak ada data KPI dalam context.",
-                      "kpi_calculated": "[]",
-                      "total_kpi": 0,
-                      "hijau": 0,
-                      "kuning": 0,
-                      "merah": 0
-                  }
-
-              try:
-                  data = json.loads(context)
-              except (json.JSONDecodeError, TypeError):
-                  return {
-                      "kpi_summary": "Context tidak berformat JSON valid. Data akan diproses oleh LLM secara langsung.",
-                      "kpi_calculated": "[]",
-                      "total_kpi": 0,
-                      "hijau": 0,
-                      "kuning": 0,
-                      "merah": 0
-                  }
-
-              # Jika data bukan list, coba ambil key yang berisi list KPI
-              if isinstance(data, dict):
-                  # Cari key yang mengandung list of KPI objects
-                  for key in ["kpi", "kpis", "data", "items", "metrics"]:
-                      if key in data and isinstance(data[key], list):
-                          data = data[key]
-                          break
-                  else:
-                      # Kembalikan context apa adanya jika tidak ditemukan struktur KPI
-                      return {
-                          "kpi_summary": "Struktur JSON tidak mengandung array KPI standar.",
-                          "kpi_calculated": json.dumps(data, ensure_ascii=False),
-                          "total_kpi": 0,
-                          "hijau": 0,
-                          "kuning": 0,
-                          "merah": 0
-                      }
-
-              if not isinstance(data, list):
-                  return {
-                      "kpi_summary": "Format data KPI tidak dikenali.",
-                      "kpi_calculated": "[]",
-                      "total_kpi": 0,
-                      "hijau": 0,
-                      "kuning": 0,
-                      "merah": 0
-                  }
-
-              hasil = []
-              hijau = kuning = merah = 0
-
-              for item in data:
-                  if not isinstance(item, dict):
-                      continue
-                  nama   = item.get("nama") or item.get("name") or item.get("kpi_name") or "Unknown"
-                  aktual = item.get("aktual") or item.get("actual") or item.get("realisasi") or 0
-                  target = item.get("target") or item.get("tgt") or 1
-                  pola   = str(item.get("pola") or item.get("pattern") or "MAX").upper()
-
-                  try:
-                      aktual = float(aktual)
-                      target = float(target)
-                      if target == 0:
-                          score = 0.0
-                      elif pola == "MIN":
-                          score = round((target / aktual) * 100, 2) if aktual != 0 else 0.0
-                      else:  # MAX (default)
-                          score = round((aktual / target) * 100, 2)
-                  except (TypeError, ValueError, ZeroDivisionError):
-                      score = 0.0
-
-                  if score >= 90:
-                      status = "🟢 Hijau"
-                      hijau += 1
-                  elif score >= 75:
-                      status = "🟡 Kuning"
-                      kuning += 1
-                  else:
-                      status = "🔴 Merah"
-                      merah += 1
-
-                  entry = dict(item)
-                  entry["score_pct"] = score
-                  entry["status"]    = status
-                  hasil.append(entry)
-
-              total = len(hasil)
-              summary_lines = [f"Total KPI: {total} | 🟢 {hijau} | 🟡 {kuning} | 🔴 {merah}"]
-              merah_list = [f"  - {x.get('nama','?')} ({x['score_pct']}%)" for x in hasil if "🔴" in x["status"]]
-              if merah_list:
-                  summary_lines.append("KPI Merah:")
-                  summary_lines.extend(merah_list)
-
-              return {
-                  "kpi_summary": "\n".join(summary_lines),
-                  "kpi_calculated": json.dumps(hasil, ensure_ascii=False),
-                  "total_kpi": total,
-                  "hijau": hijau,
-                  "kuning": kuning,
-                  "merah": merah
-              }
+        code: "import json\nimport re\n\n# ─────────────────────────────────────\n\
+          # A) KALKULASI SCORE KPI\n# ─────────────────────────────────────\ndef calc_kpi(context_str):\n\
+          \    if not context_str or not context_str.strip():\n        return \"Tidak\
+          \ ada data KPI.\", \"[]\", 0, 0, 0, 0\n    try:\n        data = json.loads(context_str)\n\
+          \    except Exception:\n        return \"Context bukan JSON valid.\", \"\
+          []\", 0, 0, 0, 0\n\n    if isinstance(data, dict):\n        for k in [\"\
+          kpi\",\"kpis\",\"data\",\"items\",\"metrics\"]:\n            if k in data\
+          \ and isinstance(data[k], list):\n                data = data[k]; break\n\
+          \        else:\n            return \"Struktur JSON tidak ada array KPI.\"\
+          , json.dumps(data,ensure_ascii=False), 0, 0, 0, 0\n\n    if not isinstance(data,\
+          \ list):\n        return \"Format data tidak dikenali.\", \"[]\", 0, 0,\
+          \ 0, 0\n\n    hasil, hijau, kuning, merah = [], 0, 0, 0\n    for item in\
+          \ data:\n        if not isinstance(item, dict): continue\n        nama  \
+          \ = item.get(\"nama\") or item.get(\"name\") or item.get(\"kpi_name\") or\
+          \ \"Unknown\"\n        aktual = item.get(\"aktual\") or item.get(\"actual\"\
+          ) or item.get(\"realisasi\") or 0\n        target = item.get(\"target\"\
+          ) or item.get(\"tgt\") or 1\n        pola   = str(item.get(\"pola\") or\
+          \ item.get(\"pattern\") or \"MAX\").upper()\n        try:\n            aktual,\
+          \ target = float(aktual), float(target)\n            if target == 0: score\
+          \ = 0.0\n            elif pola == \"MIN\": score = round((target/aktual)*100,2)\
+          \ if aktual else 0.0\n            else: score = round((aktual/target)*100,2)\n\
+          \        except: score = 0.0\n        if score >= 90:   status = \"\\U0001f7e2\
+          \ Hijau\";  hijau  += 1\n        elif score >= 75: status = \"\\U0001f7e1\
+          \ Kuning\"; kuning += 1\n        else:             status = \"\\U0001f534\
+          \ Merah\";  merah  += 1\n        e = dict(item); e[\"score_pct\"] = score;\
+          \ e[\"status\"] = status\n        hasil.append(e)\n\n    total = len(hasil)\n\
+          \    lines = [f\"Total KPI: {total} | \\U0001f7e2 {hijau} | \\U0001f7e1\
+          \ {kuning} | \\U0001f534 {merah}\"]\n    reds = [f\"  - {x.get('nama','?')}\
+          \ ({x['score_pct']}%)\" for x in hasil if \"Merah\" in x[\"status\"]]\n\
+          \    if reds: lines.append(\"KPI Merah:\"); lines.extend(reds)\n    return\
+          \ \"\\n\".join(lines), json.dumps(hasil,ensure_ascii=False), total, hijau,\
+          \ kuning, merah\n\n\n# ─────────────────────────────────────\n# B) KLASIFIKASI\
+          \ KATEGORI (keyword-based, tanpa LLM)\n# ─────────────────────────────────────\n\
+          def classify_query(query, role):\n    q = query.lower()\n\n    # Kata kunci\
+          \ teknis/admin\n    admin_kw = [\n        \"database\",\"db\",\"schema\"\
+          ,\"tabel\",\"table\",\"kolom\",\"column\",\n        \"api\",\"endpoint\"\
+          ,\"integrasi\",\"integration\",\"json format\",\n        \"struktur data\"\
+          ,\"query sql\",\"sql\",\"error sistem\",\"bug\",\n        \"konfigurasi\"\
+          ,\"config\",\"server\",\"deploy\",\"log\",\"debug\"\n    ]\n    # Kata kunci\
+          \ out-of-scope\n    oos_kw = [\n        \"cuaca\",\"weather\",\"resep\"\
+          ,\"masak\",\"film\",\"lagu\",\"musik\",\n        \"olahraga\",\"bola\",\"\
+          politik\",\"berita\",\"news\",\"saham\",\n        \"cryptocurrency\",\"crypto\"\
+          ,\"bitcoin\",\"forex\"\n    ]\n    # Kata kunci KPI/bisnis\n    kpi_kw =\
+          \ [\n        \"kpi\",\"performa\",\"performance\",\"target\",\"realisasi\"\
+          ,\"aktual\",\n        \"score\",\"metrik\",\"metric\",\"departemen\",\"\
+          laporan\",\"report\",\n        \"analisis\",\"analysis\",\"rekomendasi\"\
+          ,\"recommendation\",\n        \"merah\",\"kuning\",\"hijau\",\"underperform\"\
+          ,\"overperform\",\n        \"otp\",\"load factor\",\"cask\",\"rask\",\"\
+          revenue\",\"cost\",\"biaya\",\n        \"pendapatan\",\"laba\",\"rugi\"\
+          ,\"profit\",\"loss\",\"margin\",\n        \"penumpang\",\"pax\",\"flight\"\
+          ,\"penerbangan\",\"rute\",\"route\",\n        \"avtur\",\"fuel\",\"kurs\"\
+          ,\"inflasi\",\"trend\",\"ringkasan\",\"summary\"\n    ]\n\n    # Jika role\
+          \ admin dan ada keyword teknis → admin_technical\n    if role == \"admin\"\
+          \ and any(kw in q for kw in admin_kw):\n        return \"admin_technical\"\
+          \n    # Cek out-of-scope dulu (harus mayoritas keyword OOS, bukan hanya\
+          \ 1)\n    oos_hits = sum(1 for kw in oos_kw if kw in q)\n    kpi_hits =\
+          \ sum(1 for kw in kpi_kw if kw in q)\n    if oos_hits > 0 and kpi_hits\
+          \ == 0:\n        return \"out_of_scope\"\n    # Default: kpi_analysis (lebih\
+          \ aman)\n    return \"kpi_analysis\"\n\n\n# ─────────────────────────────────────\n\
+          # C) EKSTRAKSI PARAMETER (regex/keyword, tanpa LLM)\n# ─────────────────────────────────────\n\
+          def extract_params(query):\n    q = query.lower()\n\n    # Deteksi departemen\n\
+          \    dept_map = {\n        \"finance\":     [\"finance\",\"keuangan\",\"\
+          finansial\"],\n        \"operations\":   [\"operation\",\"operasi\",\"ops\"\
+          ,\"operasional\"],\n        \"commercial\":   [\"commercial\",\"komersial\"\
+          ,\"revenue\",\"penjualan\"],\n        \"ground handling\": [\"ground\",\"\
+          handling\",\"ground handling\"],\n        \"engineering\":   [\"engineering\"\
+          ,\"teknik\",\"maintenance\",\"perawatan\"],\n        \"HR\":             [\"
+          hr\",\"sdm\",\"human resource\",\"kepegawaian\"],\n        \"IT\":       \
+          \      [\"it \",\" it\",\"teknologi informasi\"],\n    }\n    dept = \"ALL\"\
+          \n    for d, kws in dept_map.items():\n        if any(kw in q for kw in\
+          \ kws):\n            dept = d; break\n\n    # Deteksi periode\n    bulan\
+          \ = [\"januari\",\"februari\",\"maret\",\"april\",\"mei\",\"juni\",\n  \
+          \          \"juli\",\"agustus\",\"september\",\"oktober\",\"november\",\"\
+          desember\"]\n    periode = \"ALL\"\n    for b in bulan:\n        if b in\
+          \ q: periode = b.capitalize(); break\n    # Cek kuartal\n    qm = re.search(r'q([1-4])\
+          \ ?(\\d{4})?', q)\n    if qm: periode = f\"Q{qm.group(1)}\" + (f\" {qm.group(2)}\"\
+          \ if qm.group(2) else \"\")\n    # Cek tahun\n    ym = re.search(r'(202[0-9]|203[0-9])',\
+          \ q)\n    if ym and periode == \"ALL\": periode = ym.group(1)\n    if \"\
+          bulan ini\" in q: periode = \"bulan ini\"\n    if \"tahun ini\" in q: periode\
+          \ = \"tahun ini\"\n\n    # Deteksi metrik\n    metrik_map = {\n        \"\
+          OTP\":         [\"otp\",\"on time\",\"ketepatan waktu\"],\n        \"Load\
+          \ Factor\": [\"load factor\",\"lf \",\" lf\",\"isian\"],\n        \"CASK\"\
+          :        [\"cask\",\"cost per seat\",\"biaya per kursi\"],\n        \"RASK\"\
+          :        [\"rask\",\"revenue per seat\"],\n        \"Revenue\":    [\"revenue\"\
+          ,\"pendapatan\"],\n        \"Profit\":     [\"profit\",\"laba\",\"margin\"\
+          ],\n        \"Pax\":        [\"pax\",\"penumpang\",\"passenger\"],\n    \
+          \    \"Fuel Cost\":  [\"avtur\",\"fuel\",\"bbm\",\"bahan bakar\"],\n    }\n\
+          \    metrik = \"ALL\"\n    for m, kws in metrik_map.items():\n        if\
+          \ any(kw in q for kw in kws):\n            metrik = m; break\n\n    # Deteksi\
+          \ tipe request\n    tipe = \"analisis\"\n    if any(w in q for w in [\"rekomendasi\"\
+          ,\"saran\",\"improve\",\"solusi\",\"langkah\"]): tipe = \"rekomendasi\"\n\
+          \    elif any(w in q for w in [\"ringkasan\",\"summary\",\"rangkuman\",\"\
+          overview\"]): tipe = \"summary\"\n    elif any(w in q for w in [\"bandingkan\"\
+          ,\"compare\",\"vs\",\"perbandingan\"]): tipe = \"perbandingan\"\n    elif\
+          \ any(w in q for w in [\"trend\",\"tren\",\"histori\",\"history\",\"grafik\"\
+          ]): tipe = \"trend\"\n    elif any(w in q for w in [\"jelaskan\",\"apa itu\"\
+          ,\"pengertian\",\"definisi\"]): tipe = \"penjelasan\"\n\n    return {\"departemen\"\
+          : dept, \"periode\": periode, \"metrik\": metrik, \"tipe_request\": tipe}\n\
+          \n\n# ─────────────────────────────────────\n# D) QUERY REWRITE (tanpa LLM)\n\
+          # ─────────────────────────────────────\ndef rewrite_query(query, params,\
+          \ kpi_summary):\n    q = query\n    # Ekspansi singkatan umum\n    expansions\
+          \ = {\n        r'\\bOTP\\b': 'OTP (On Time Performance)',\n        r'\\\
+          bLF\\b':  'Load Factor (tingkat isian kursi)',\n        r'\\bCASK\\b': 'CASK\
+          \ (Cost per Available Seat Kilometer)',\n        r'\\bRASK\\b': 'RASK (Revenue\
+          \ per Available Seat Kilometer)',\n        r'\\bPax\\b':  'Pax (jumlah penumpang)',\n\
+          \    }\n    for pattern, replacement in expansions.items():\n        q =\
+          \ re.sub(pattern, replacement, q, flags=re.IGNORECASE)\n\n    # Tambah konteks\
+          \ parameter\n    extras = []\n    if params[\"departemen\"] != \"ALL\":\n\
+          \        extras.append(f\"departemen {params['departemen']}\")\n    if params[\"\
+          periode\"] != \"ALL\":\n        extras.append(f\"periode {params['periode']}\"\
+          )\n    if params[\"metrik\"] != \"ALL\":\n        extras.append(f\"metrik\
+          \ {params['metrik']}\")\n    if \"merah\" in query.lower() or \"underperform\"\
+          \ in query.lower():\n        extras.append(\"penyebab pencapaian rendah\
+          \ rekomendasi peningkatan\")\n    if extras:\n        q = q + \". Fokus\
+          \ pada: \" + \", \".join(extras) + \".\"\n\n    # Tambah hint dari ringkasan\
+          \ KPI jika ada KPI merah\n    if \"Merah\" in kpi_summary:\n        q +=\
+          \ \" Terdapat KPI yang underperform, analisis faktor penyebab.\"\n\n    return\
+          \ q\n\n\n# ─────────────────────────────────────\n# E) SYSTEM HINT untuk\
+          \ LLM\n# ─────────────────────────────────────\ndef build_system_hint(category,\
+          \ role, params):\n    hints = []\n    if category == \"admin_technical\"\
+          :\n        hints.append(\"[MODE: IT Analyst] Fokus pada aspek teknis, struktur\
+          \ data, dan sistem.\")\n    elif role == \"direksi\":\n        hints.append(\"\
+          [MODE: Direksi] Jawaban maksimal 300 kata. Struktur: kondisi terkini → penyebab\
+          \ → action plan.\")\n    elif role == \"corporate_planning\":\n        hints.append(\"\
+          [MODE: Corporate Planning] Gunakan bahasa analisis bisnis mendalam. Struktur:\
+          \ Executive Summary → Analisis → Root Cause → Rekomendasi.\")\n    if params[\"\
+          tipe_request\"] == \"rekomendasi\":\n        hints.append(\"User meminta\
+          \ REKOMENDASI konkret, bukan hanya analisis.\")\n    elif params[\"tipe_request\"\
+          ] == \"summary\":\n        hints.append(\"User meminta RINGKASAN, sajikan\
+          \ poin-poin utama secara padat.\")\n    elif params[\"tipe_request\"] ==\
+          \ \"perbandingan\":\n        hints.append(\"User meminta PERBANDINGAN, gunakan\
+          \ format tabel atau list paralel.\")\n    return \" | \".join(hints) if\
+          \ hints else \"\"\n\n\n# ─────────────────────────────────────\n# MAIN\n\
+          # ─────────────────────────────────────\ndef main(query: str, context: str,\
+          \ role: str) -> dict:\n    # A) Kalkulasi KPI\n    kpi_summary, kpi_calculated,\
+          \ total, hijau, kuning, merah = calc_kpi(context)\n\n    # B) Klasifikasi\n\
+          \    category = classify_query(query, role)\n\n    # C) Ekstrak parameter\n\
+          \    params = extract_params(query)\n\n    # D) Rewrite query\n    enriched_query\
+          \ = rewrite_query(query, params, kpi_summary)\n\n    # E) System hint\n\
+          \    system_hint = build_system_hint(category, role, params)\n\n    return\
+          \ {\n        \"kpi_summary\":    kpi_summary,\n        \"kpi_calculated\"\
+          : kpi_calculated,\n        \"category\":       category,\n        \"param_json\"\
+          :      json.dumps(params, ensure_ascii=False),\n        \"enriched_query\"\
+          : enriched_query,\n        \"system_hint\":    system_hint,\n        \"\
+          is_in_scope\":    category in (\"kpi_analysis\", \"admin_technical\")\n\
+          \    }\n"
         code_language: python3
-        desc: Kalkulasi score KPI (MAX/MIN), status 🟢🟡🔴, dan ringkasan statistik
-          dari data JSON context sebelum masuk ke LLM.
+        desc: "Preprocessing all-in-one: kalkulasi KPI, klasifikasi query, ekstraksi\
+          \ parameter, query rewrite, dan system hint — semua tanpa LLM."
         outputs:
-          hijau:
+          category:
             children: null
-            type: number
+            type: string
+          enriched_query:
+            children: null
+            type: string
+          is_in_scope:
+            children: null
+            type: string
           kpi_calculated:
             children: null
             type: string
           kpi_summary:
             children: null
             type: string
-          kuning:
+          param_json:
             children: null
-            type: number
-          merah:
+            type: string
+          system_hint:
             children: null
-            type: number
-          total_kpi:
-            children: null
-            type: number
+            type: string
         selected: false
-        title: "Kalkulasi Score KPI \U0001F4CA"
+        title: "Code Preprocessor \u2699\uFE0F"
         type: code
         variables:
+        - value_selector:
+          - sys
+          - query
+          variable: query
         - value_selector:
           - start
           - context
           variable: context
+        - value_selector:
+          - start
+          - role
+          variable: role
       height: 54
-      id: code_kpi_calc
+      id: code_preprocessor
       position:
         x: 400
         y: 400
@@ -400,86 +394,27 @@ workflow:
       type: custom
       width: 242
 
-    # ════════════════════════════════════════
-    # NODE 3: QUESTION CLASSIFIER (LLM qwen-turbo)
-    # Menentukan kategori pertanyaan:
-    # kpi_analysis | admin_technical | out_of_scope
-    # ════════════════════════════════════════
+    # ══════════════════════════════════════════════════
+    # NODE 3: IF/ELSE ROUTER
+    # true  → is_in_scope = "True"  → Knowledge Retrieval → LLM
+    # false → is_in_scope = "False" → Answer OOS
+    # ══════════════════════════════════════════════════
     - data:
-        cases:
-        - case_id: kpi_analysis
-          conditions:
-          - id: cond-kpi
-            value: kpi_analysis
-            varType: string
-            variable_selector:
-            - llm_classifier
-            - category
-            comparison_operator: contains
-          logical_operator: and
-        - case_id: admin_technical
-          conditions:
-          - id: cond-admin
-            value: admin_technical
-            varType: string
-            variable_selector:
-            - llm_classifier
-            - category
-            comparison_operator: contains
-          logical_operator: and
-        - case_id: out_of_scope
-          conditions:
-          - id: cond-oos
-            value: out_of_scope
-            varType: string
-            variable_selector:
-            - llm_classifier
-            - category
-            comparison_operator: contains
-          logical_operator: and
-        desc: Klasifikasi jenis pertanyaan user ke dalam 3 kategori
-        memory:
-          role_prefix:
-            assistant: Classifier
-            user: User
-          window:
-            enabled: false
-            size: 3
-        model:
-          completion_params:
-            max_tokens: 64
-            temperature: 0.0
-          mode: chat
-          name: qwen-turbo
-          provider: langgenius/tongyi/tongyi
-        prompt_template:
-        - id: sys-classifier
-          role: system
-          text: |
-            Anda adalah classifier pertanyaan. Tugas Anda HANYA mengklasifikasikan pertanyaan user ke salah satu dari 3 kategori berikut:
-
-            1. kpi_analysis   → Pertanyaan tentang KPI, performa, metrik, analisis, laporan, rekomendasi, trend, target, realisasi, departemen, maskapai.
-            2. admin_technical → Pertanyaan tentang sistem, database, struktur data, IT, API, teknis, integrasi, error sistem.
-            3. out_of_scope   → Pertanyaan di luar konteks KPI & sistem (cuaca, resep makanan, berita umum, dll).
-
-            ATURAN:
-            - Jika ROLE = "admin" dan pertanyaan teknis → wajib admin_technical.
-            - Jika ragu antara kpi_analysis dan admin_technical → pilih kpi_analysis.
-            - Balas HANYA dengan satu kata: kpi_analysis / admin_technical / out_of_scope
-            - JANGAN tambahkan penjelasan apapun.
-
-            Role user saat ini: {{#start.role#}}
-        - id: usr-classifier
-          role: user
-          text: '{{#sys.query#}}'
-        output_key: category
+        conditions:
+        - comparison_operator: is
+          id: cond-scope
+          value: 'True'
+          varType: string
+          variable_selector:
+          - code_preprocessor
+          - is_in_scope
+        desc: Route berdasarkan hasil klasifikasi query
+        logical_operator: and
         selected: false
-        title: "Question Classifier \U0001F50D"
-        type: llm
-        vision:
-          enabled: false
-      height: 115
-      id: llm_classifier
+        title: "Router: In Scope? \U0001F500"
+        type: if-else
+      height: 95
+      id: ifelse_router
       position:
         x: 720
         y: 400
@@ -489,132 +424,16 @@ workflow:
       type: custom
       width: 242
 
-    # ════════════════════════════════════════
-    # NODE 4: PARAMETER EXTRACTOR (LLM qwen-turbo)
-    # Ekstrak entitas: departemen, periode, metrik, tipe_request
-    # ════════════════════════════════════════
-    - data:
-        desc: Ekstrak parameter kunci dari pertanyaan untuk memperkaya query RAG
-        memory:
-          role_prefix:
-            assistant: Extractor
-            user: User
-          window:
-            enabled: false
-            size: 3
-        model:
-          completion_params:
-            max_tokens: 256
-            temperature: 0.0
-          mode: chat
-          name: qwen-turbo
-          provider: langgenius/tongyi/tongyi
-        prompt_template:
-        - id: sys-extractor
-          role: system
-          text: |
-            Anda adalah parameter extractor untuk sistem KPI maskapai penerbangan.
-            Ekstrak parameter berikut dari pertanyaan user dalam format JSON satu baris.
-
-            Parameter yang diekstrak:
-            - departemen: nama departemen yang disebut (misal: "Finance", "Operations", "Commercial", "Ground Handling", "ALL" jika tidak spesifik)
-            - periode: periode waktu (misal: "Januari 2025", "Q1 2025", "2024", "bulan ini", "ALL" jika tidak spesifik)
-            - metrik: nama KPI/metrik spesifik yang disebut (misal: "OTP", "Load Factor", "CASK", "Revenue", "ALL" jika tidak spesifik)
-            - tipe_request: jenis permintaan ("analisis" | "rekomendasi" | "summary" | "perbandingan" | "trend" | "penjelasan")
-            - kata_kunci_tambahan: kata kunci relevan lainnya yang bisa membantu pencarian di knowledge base
-
-            ATURAN:
-            - Balas HANYA dalam format JSON satu baris, tanpa markdown, tanpa penjelasan.
-            - Contoh output: {"departemen":"Finance","periode":"Q1 2025","metrik":"CASK","tipe_request":"analisis","kata_kunci_tambahan":"biaya operasional efisiensi"}
-        - id: usr-extractor
-          role: user
-          text: '{{#sys.query#}}'
-        selected: false
-        title: "Parameter Extractor \U0001F9E0"
-        type: llm
-        vision:
-          enabled: false
-      height: 115
-      id: llm_param_extractor
-      position:
-        x: 1040
-        y: 200
-      positionAbsolute:
-        x: 1040
-        y: 200
-      type: custom
-      width: 242
-
-    # ════════════════════════════════════════
-    # NODE 5: QUERY REWRITER (LLM qwen-turbo)
-    # Rewrite query menjadi lebih kaya konteks
-    # untuk Knowledge Retrieval
-    # ════════════════════════════════════════
-    - data:
-        desc: Rewrite query user menjadi query optimal untuk pencarian di Knowledge
-          Base KPI
-        memory:
-          role_prefix:
-            assistant: Rewriter
-            user: User
-          window:
-            enabled: false
-            size: 3
-        model:
-          completion_params:
-            max_tokens: 256
-            temperature: 0.1
-          mode: chat
-          name: qwen-turbo
-          provider: langgenius/tongyi/tongyi
-        prompt_template:
-        - id: sys-rewriter
-          role: system
-          text: |
-            Anda adalah query rewriter untuk sistem RAG KPI maskapai penerbangan.
-            Tugas Anda: ubah pertanyaan user menjadi query pencarian yang optimal untuk Knowledge Base.
-
-            Konteks yang tersedia:
-            - Parameter hasil ekstraksi: {{#llm_param_extractor.text#}}
-            - Ringkasan KPI terhitung: {{#code_kpi_calc.kpi_summary#}}
-            - Role user: {{#start.role#}}
-
-            ATURAN REWRITING:
-            1. Perluas singkatan KPI (OTP=On Time Performance, LF=Load Factor, CASK=Cost per Available Seat Kilometer, RASK=Revenue per Available Seat Kilometer, dll.)
-            2. Tambahkan sinonim dan kata kunci relevan domain penerbangan.
-            3. Sertakan periode, departemen, dan metrik yang teridentifikasi.
-            4. Jika pertanyaan menyebut "merah" atau "underperform", tambahkan kata kunci "pencapaian rendah penyebab rekomendasi".
-            5. Maksimal 3 kalimat query yang padat dan informatif.
-            6. Balas HANYA dengan query yang sudah di-rewrite, tanpa penjelasan.
-        - id: usr-rewriter
-          role: user
-          text: 'Query asli: {{#sys.query#}}'
-        selected: false
-        title: "Query Rewriter \u270F\uFE0F"
-        type: llm
-        vision:
-          enabled: false
-      height: 115
-      id: llm_query_rewriter
-      position:
-        x: 1040
-        y: 400
-      positionAbsolute:
-        x: 1040
-        y: 400
-      type: custom
-      width: 242
-
-    # ════════════════════════════════════════
-    # NODE 6: KNOWLEDGE RETRIEVAL
-    # Menggunakan query yang sudah di-rewrite
-    # top_k dinaikkan ke 8, threshold diturunkan ke 0.3
-    # ════════════════════════════════════════
+    # ══════════════════════════════════════════════════
+    # NODE 4: KNOWLEDGE RETRIEVAL
+    # Menggunakan enriched_query dari Code Preprocessor
+    # top_k=8, threshold=0.3
+    # ══════════════════════════════════════════════════
     - data:
         dataset_ids:
         - Ue95WEwzPBAoBEuBAdDh/F6tcivqZwRCieOT/jf9PJICKYFb7cuI+owDb59qQ0vG
-        desc: Ambil konteks relevan dari Knowledge Base KPI menggunakan query yang
-          sudah di-rewrite (top_k=8, threshold=0.3)
+        desc: Ambil konteks relevan dari Knowledge Base menggunakan query yang sudah
+          diperkaya
         multiple_retrieval_config:
           reranking_enable: true
           reranking_mode: reranking_model
@@ -625,8 +444,8 @@ workflow:
           top_k: 8
         query_attachment_selector: []
         query_variable_selector:
-        - llm_query_rewriter
-        - text
+        - code_preprocessor
+        - enriched_query
         retrieval_mode: multiple
         selected: false
         single_retrieval_config:
@@ -641,26 +460,27 @@ workflow:
       height: 95
       id: knowledge
       position:
-        x: 1360
+        x: 1040
         y: 400
       positionAbsolute:
-        x: 1360
+        x: 1040
         y: 400
       type: custom
       width: 242
 
-    # ════════════════════════════════════════
-    # NODE 7: LLM UTAMA — KPI Assistant (qwen-max)
-    # Menerima: KB result + KPI terhitung + parameter
-    # ════════════════════════════════════════
+    # ══════════════════════════════════════════════════
+    # NODE 5: LLM UTAMA — satu-satunya LLM (qwen-max)
+    # Menerima semua output dari Code Preprocessor
+    # dan hasil Knowledge Retrieval
+    # ══════════════════════════════════════════════════
     - data:
         context:
           enabled: true
           variable_selector:
           - knowledge
           - result
-        desc: Asisten AI role-aware untuk KPI dengan data terhitung dan parameter
-          terstruktur
+        desc: Satu-satunya LLM. Menerima data KPI terhitung, parameter terstruktur,
+          dan hasil RAG.
         memory:
           role_prefix:
             assistant: KPI Assistant
@@ -679,48 +499,28 @@ workflow:
         prompt_template:
         - id: sys-main
           role: system
-          text: |
-            Anda adalah "Asisten Eksekutif & Manajemen KPI" yang Cerdas untuk maskapai penerbangan.
-
-            ═══ DATA TERSTRUKTUR (GUNAKAN SEBAGAI ACUAN UTAMA) ═══
-            Hak Akses (Role): {{#start.role#}}
-
-            📊 Ringkasan KPI Terhitung (Otomatis):
-            {{#code_kpi_calc.kpi_summary#}}
-
-            📋 Detail KPI Lengkap (JSON dengan score & status):
-            {{#code_kpi_calc.kpi_calculated#}}
-
-            📌 Parameter Pertanyaan Teridentifikasi:
-            {{#llm_param_extractor.text#}}
-
-            🌐 Referensi Data Makro Ekonomi (Kurs, Avtur, Inflasi):
-            {{#start.context#}}
-
-            ═══ PANDUAN MENJAWAB BERDASARKAN ROLE ═══
-
-            [JIKA ROLE = "direksi"]
-            - Format: Presentasi CEO/BOD. Ringkas, lugas, berbasis data.
-            - WAJIB kaitkan KPI merah dengan faktor makro (Kurs USD, Avtur, Inflasi) jika tersedia di context.
-            - Struktur jawaban: 1) Kondisi terkini 2) Penyebab utama 3) Action Plan (bullet points singkat).
-            - Maksimal 300 kata.
-
-            [JIKA ROLE = "corporate_planning"]
-            - Format: Analisis bisnis konsultan, mendalam dan terstruktur.
-            - Kaitkan setiap penurunan metrik dengan faktor makro ekonomi yang relevan.
-            - Struktur jawaban: 1) Executive Summary 2) Analisis Detail 3) Root Cause 4) Rekomendasi Strategis.
-            - Gunakan tabel atau bullet points untuk kejelasan.
-
-            [JIKA ROLE = "admin"]
-            - Berperan sebagai IT Analyst senior.
-            - Bantu pertanyaan struktur database, API, sistem integrasi, atau troubleshooting.
-
-            ═══ RUMUS & ACUAN SISTEM ═══
-            🟢 Hijau: Score >= 90% | 🟡 Kuning: 75-89% | 🔴 Merah: < 75%
-            Pola MAX: Akt/Tgt × 100 | Pola MIN: Tgt/Akt × 100
-
-            PENTING: Gunakan data dari {{#code_kpi_calc.kpi_calculated#}} dan {{#start.context#}}.
-            Jangan mengarang angka metrik makro (kurs/avtur) yang tidak ada di context.
+          text: "Anda adalah \"Asisten Eksekutif & Manajemen KPI\" yang Cerdas untuk\
+            \ maskapai penerbangan.\n\n=== INSTRUKSI KONTEKSTUAL ===\nHak Akses (Role):\
+            \ {{#start.role#}}\nKategori Query: {{#code_preprocessor.category#}}\n\
+            {{#code_preprocessor.system_hint#}}\n\n=== DATA KPI TERHITUNG (ACUAN\
+            \ ANGKA UTAMA) ===\nRingkasan:\n{{#code_preprocessor.kpi_summary#}}\n\
+            \nDetail KPI (JSON dengan score & status):\n{{#code_preprocessor.kpi_calculated#}}\n\
+            \n=== PARAMETER PERTANYAAN ===\n{{#code_preprocessor.param_json#}}\n\n\
+            === DATA MAKRO EKONOMI (Kurs, Avtur, Inflasi) ===\n{{#start.context#}}\n\
+            \n=== PANDUAN MENJAWAB BERDASARKAN ROLE ===\n\n[ROLE = \"direksi\"]\n\
+            - Sangat ringkas, lugas, berbasis data. Seperti briefing CEO/BOD.\n- WAJIB\
+            \ kaitkan KPI merah dengan faktor makro jika data tersedia di context.\n\
+            - Struktur: 1) Kondisi terkini 2) Penyebab 3) Action Plan (bullet points)\n\
+            - Maksimal 300 kata.\n\n[ROLE = \"corporate_planning\"]\n- Analisis bisnis\
+            \ konsultan, mendalam dan terstruktur.\n- Kaitkan penurunan metrik dengan\
+            \ faktor makro ekonomi.\n- Struktur: 1) Executive Summary 2) Analisis\
+            \ Detail 3) Root Cause 4) Rekomendasi Strategis.\n\n[ROLE = \"admin\"\
+            \ ATAU category = \"admin_technical\"]\n- Jawab sebagai IT Analyst Senior.\n\
+            - Fokus pada struktur data, schema, API, integrasi, atau troubleshooting.\n\
+            - Format JSON KPI: {\"nama\", \"aktual\", \"target\", \"pola\": \"MAX/MIN\"\
+            }.\n\n=== RUMUS & ACUAN ===\nHijau >=90% | Kuning 75-89% | Merah <75%\n\
+            Pola MAX: Akt/Tgt x100 | Pola MIN: Tgt/Akt x100\nGUNAKAN data dari kpi_calculated\
+            \ di atas. JANGAN mengarang angka makro.\n"
         - id: usr-main
           role: user
           text: '{{#sys.query#}}'
@@ -732,177 +532,19 @@ workflow:
       height: 115
       id: llm_assistant
       position:
-        x: 1680
+        x: 1360
         y: 400
       positionAbsolute:
-        x: 1680
-        y: 400
-      type: custom
-      width: 242
-
-    # ════════════════════════════════════════
-    # NODE 8: LLM VALIDATOR / REFLECTOR (qwen-plus)
-    # Cek kualitas jawaban sebelum dikirim ke user
-    # ════════════════════════════════════════
-    - data:
-        desc: Validasi dan perbaiki kualitas jawaban LLM Utama sebelum dikirim ke
-          user
-        memory:
-          role_prefix:
-            assistant: Validator
-            user: System
-          window:
-            enabled: false
-            size: 3
-        model:
-          completion_params:
-            max_tokens: 4096
-            temperature: 0.3
-            top_p: 0.9
-          mode: chat
-          name: qwen-plus
-          provider: langgenius/tongyi/tongyi
-        prompt_template:
-        - id: sys-validator
-          role: system
-          text: |
-            Anda adalah Quality Control untuk jawaban KPI Assistant maskapai penerbangan.
-
-            DATA KONTEKS:
-            - Role user: {{#start.role#}}
-            - Pertanyaan user: {{#sys.query#}}
-            - Ringkasan KPI: {{#code_kpi_calc.kpi_summary#}}
-            - Data Makro tersedia: {{#start.context#}}
-
-            JAWABAN YANG PERLU DIPERIKSA:
-            {{#llm_assistant.text#}}
-
-            CHECKLIST VALIDASI (periksa satu per satu):
-            ✅ C1: Apakah jawaban menjawab pertanyaan user secara langsung?
-            ✅ C2: Apakah angka/score KPI yang disebutkan konsisten dengan data terhitung?
-            ✅ C3: Jika KPI merah disebutkan DAN data makro tersedia → apakah faktor kurs/avtur/inflasi dikaitkan?
-            ✅ C4: Apakah format sesuai role? (direksi=ringkas, corporate_planning=mendalam, admin=teknis)
-            ✅ C5: Apakah ada angka yang dikarang (tidak ada di context atau data KPI)?
-
-            ATURAN OUTPUT:
-            - Jika SEMUA checklist lulus (C1-C5) → kembalikan jawaban PERSIS SAMA tanpa modifikasi apapun.
-            - Jika ada checklist yang gagal → perbaiki HANYA bagian yang bermasalah, pertahankan bagian lain.
-            - Jangan tambahkan komentar seperti "Jawaban sudah divalidasi" atau "Perbaikan dilakukan".
-            - Output akhir adalah jawaban final yang siap ditampilkan ke user.
-        - id: usr-validator
-          role: user
-          text: 'Periksa dan kembalikan jawaban yang telah divalidasi.'
-        selected: false
-        title: "Validator & Refiner \u2705"
-        type: llm
-        vision:
-          enabled: false
-      height: 115
-      id: llm_validator
-      position:
-        x: 2000
-        y: 400
-      positionAbsolute:
-        x: 2000
+        x: 1360
         y: 400
       type: custom
       width: 242
 
-    # ════════════════════════════════════════
-    # NODE 9: LLM ADMIN (qwen-plus)
-    # Branch khusus untuk pertanyaan teknis/admin
-    # ════════════════════════════════════════
+    # ══════════════════════════════════════════════════
+    # NODE 6: ANSWER — Final
+    # ══════════════════════════════════════════════════
     - data:
-        desc: Asisten IT Analyst untuk pertanyaan teknis, database, dan sistem
-        memory:
-          role_prefix:
-            assistant: IT Analyst
-            user: Admin
-          window:
-            enabled: true
-            size: 5
-        model:
-          completion_params:
-            max_tokens: 2048
-            temperature: 0.3
-          mode: chat
-          name: qwen-plus
-          provider: langgenius/tongyi/tongyi
-        prompt_template:
-        - id: sys-admin
-          role: system
-          text: |
-            Anda adalah IT Analyst Senior untuk sistem KPI maskapai penerbangan.
-
-            Konteks Sistem:
-            - Aplikasi: KPI Dashboard & Reporting System
-            - Stack: Dify workflow, Knowledge Base RAG, Qwen LLM
-            - Data: KPI JSON context dari sistem sumber
-
-            Data yang tersedia di sistem:
-            {{#start.context#}}
-
-            Ringkasan KPI yang terkalkulasi:
-            {{#code_kpi_calc.kpi_summary#}}
-
-            PANDUAN:
-            - Jawab pertanyaan teknis tentang struktur data, database schema, API, integrasi, atau troubleshooting.
-            - Jika pertanyaan menyebut struktur JSON KPI, referensikan ke format: {"nama", "aktual", "target", "pola": "MAX/MIN"}.
-            - Berikan contoh query SQL atau kode jika relevan.
-            - Gunakan bahasa teknis yang tepat namun mudah dipahami admin.
-        - id: usr-admin
-          role: user
-          text: '{{#sys.query#}}'
-        selected: false
-        title: "LLM Admin IT Analyst \U0001F6E0\uFE0F"
-        type: llm
-        vision:
-          enabled: false
-      height: 115
-      id: llm_admin
-      position:
-        x: 1040
-        y: 600
-      positionAbsolute:
-        x: 1040
-        y: 600
-      type: custom
-      width: 242
-
-    # ════════════════════════════════════════
-    # NODE 10: ANSWER — Out of Scope
-    # ════════════════════════════════════════
-    - data:
-        answer: |
-          Maaf, pertanyaan Anda di luar cakupan sistem KPI Assistant ini. 🙏
-
-          Saya dirancang untuk membantu analisis KPI maskapai penerbangan, meliputi:
-          - 📊 Performa & analisis metrik KPI
-          - 📋 Laporan dan ringkasan departemen
-          - 💡 Rekomendasi peningkatan KPI
-          - 🛠️ Pertanyaan teknis sistem KPI (untuk role admin)
-
-          Silakan ajukan pertanyaan seputar topik tersebut.
-        desc: Jawaban untuk pertanyaan di luar scope KPI
-        selected: false
-        title: "Answer: Out of Scope \U0001F6AB"
-        type: answer
-      height: 101
-      id: answer_oos
-      position:
-        x: 1040
-        y: 800
-      positionAbsolute:
-        x: 1040
-        y: 800
-      type: custom
-      width: 242
-
-    # ════════════════════════════════════════
-    # NODE 11: ANSWER — Final (dari Validator)
-    # ════════════════════════════════════════
-    - data:
-        answer: '{{#llm_validator.text#}}'
+        answer: '{{#llm_assistant.text#}}'
         desc: ''
         selected: false
         title: "Answer \U0001F4E4"
@@ -910,16 +552,41 @@ workflow:
       height: 101
       id: answer
       position:
-        x: 2320
+        x: 1680
         y: 400
       positionAbsolute:
-        x: 2320
+        x: 1680
         y: 400
+      type: custom
+      width: 242
+
+    # ══════════════════════════════════════════════════
+    # NODE 7: ANSWER — Out of Scope
+    # ══════════════════════════════════════════════════
+    - data:
+        answer: "Maaf, pertanyaan Anda di luar cakupan sistem KPI Assistant ini.\
+          \ \U0001F64F\n\nSaya dirancang untuk membantu:\n- \U0001F4CA Analisis &\
+          \ performa metrik KPI maskapai\n- \U0001F4CB Laporan dan ringkasan departemen\n\
+          - \U0001F4A1 Rekomendasi peningkatan KPI\n- \U0001F6E0\uFE0F Pertanyaan\
+          \ teknis sistem KPI (role admin)\n\nSilakan ajukan pertanyaan seputar topik\
+          \ tersebut."
+        desc: Jawaban untuk pertanyaan di luar scope
+        selected: false
+        title: "Answer: Out of Scope \U0001F6AB"
+        type: answer
+      height: 101
+      id: answer_oos
+      position:
+        x: 1040
+        y: 620
+      positionAbsolute:
+        x: 1040
+        y: 620
       type: custom
       width: 242
 
     viewport:
       x: 0
       y: 0
-      zoom: 0.35
+      zoom: 0.45
   rag_pipeline_variables: []
