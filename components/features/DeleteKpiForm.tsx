@@ -76,7 +76,7 @@ export default function DeleteKpiForm({ departments }: { departments: Department
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                            Entitas / Departemen
+                            Entitas
                         </label>
                         <select className={selectClassName} value={deptId} onChange={e => setDeptId(e.target.value)}>
                             <option value="ALL">Semua Entitas pada Level Ini</option>

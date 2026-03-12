@@ -84,8 +84,8 @@ export default function AppShell({ children, user, period }: Props) {
               <BarChart2 size={18} className="text-white" />
             </div>
             <div>
-              <p className="text-gray-900 dark:text-white font-bold text-sm tracking-tight">KPI System</p>
-              <p className="text-gray-500 dark:text-gray-400 font-medium text-[11px] tracking-wide">ENTERPRISE EDITION</p>
+              <p className="text-gray-900 dark:text-white font-bold text-sm tracking-tight">Smart KPI System</p>
+              <p className="text-gray-500 dark:text-gray-400 font-medium text-[11px] tracking-wide">GARUDA INDONESIA</p>
             </div>
           </div>
           <div className="mt-4 flex justify-between items-center">

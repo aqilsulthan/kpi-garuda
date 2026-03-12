@@ -20,10 +20,10 @@ export default function KpiListClient({ initialData }: { initialData: KpiData[] 
     const [expandedPeriods, setExpandedPeriods] = useState<Record<string, boolean>>({})
 
     const togglePeriod = (period: string) => {
-        setExpandedPeriods(prev => ({ ...prev, [period]: prev[period] === undefined ? false : !prev[period] }))
+        setExpandedPeriods(prev => ({ ...prev, [period]: !prev[period] }))
     }
 
-    const isExpanded = (period: string) => expandedPeriods[period] !== false
+    const isExpanded = (period: string) => !!expandedPeriods[period]
 
     // Grouping by period
     const dataByPeriod = useMemo(() => {

@@ -4,7 +4,7 @@ const nextConfig = {
         serverActions: {
             allowedOrigins: [
                 'localhost:3000',
-                '13da-114-10-27-37.ngrok-free.app',
+                // '13da-114-10-27-37.ngrok-free.app',
             ]
         }
     },
