@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import DeptDashboardCharts from '@/components/features/DeptDashboardCharts'
 import MacroEconomicsWidget from '@/components/kpi/MacroEconomicsWidget'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
+import ReactMarkdown from 'react-markdown'
 
 interface Props {
   period: string
@@ -485,7 +486,11 @@ export default function PlanningWorkspace({ period, scorecards, externalData, us
                           ? 'bg-primary-600 text-white rounded-br-sm'
                           : 'bg-gray-50 border border-gray-100 text-gray-700 rounded-bl-sm'
                           }`}>
-                          {msg.text}
+                          {msg.role === 'ai' ? (
+                            <div className="prose prose-xs max-w-none prose-p:my-1 prose-headings:my-1.5 prose-li:my-0 prose-strong:text-gray-900 prose-blockquote:text-gray-500 prose-blockquote:border-primary-300 prose-code:bg-gray-200 prose-code:px-1 prose-code:rounded text-[13px]">
+                              <ReactMarkdown>{msg.text}</ReactMarkdown>
+                            </div>
+                          ) : msg.text}
                         </div>
                       </div>
                     ))}

@@ -1,53 +1,65 @@
 # KPI Management System
-**Next.js + NextAuth + PostgreSQL + Dify Enterprise (Qwen)**
+**Next.js 14 · NextAuth v5 · PostgreSQL · Dify Enterprise (Qwen LLM)**
 
-Sistem manajemen KPI berbasis AI yang membantu tim Corporate Planning menghasilkan insight dan rekomendasi otomatis kepada Direksi — menggantikan proses analisis manual yang memakan beberapa hari kerja.
-
----
-
-## Arsitektur
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       NEXT.JS (App Router)                  │
-│  /admin/upload  /admin/kpi-list  /planning/[p]  /board/[p]  │
-│              ↕ API Routes (6 endpoints)                     │
-└──────────────────┬──────────────────────────────────┘
-                   │
-       ┌───────────┴────────────┐
-       ▼                        ▼
-┌─────────────┐      ┌──────────────────────┐
-│  PostgreSQL │      │   Dify Enterprise    │
-│  Perusahaan │      │  kpi-analyst (WF)    │
-│  6 tabel    │      │  kpi-assistant (CF)  │
-│             │      │  KB: kpi-context     │
-└─────────────┘      └──────────────────────┘
-                              │ Qwen LLM (full access)
-```
+Sistem manajemen KPI berbasis AI yang membantu tim Corporate Planning menghasilkan laporan analisis otomatis dan menyampaikannya kepada Direksi — menggantikan proses analisis Excel manual yang memakan beberapa hari kerja.
 
 ---
 
-## Stack
+## Arsitektur Sistem
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                        NEXT.JS (App Router)                       │
+│  /admin  /planning/[period]  /board/[period]  /chat               │
+│                    ↕ API Routes                                   │
+│  /api/kpis  /api/analytics  /api/integrations/dify                │
+│  /api/users  /api/chats  /api/agent/*                             │
+└────────────────────────────────┬──────────────────────────────────┘
+                                 │
+              ┌──────────────────┴──────────────────┐
+              ▼                                      ▼
+   ┌────────────────────┐              ┌─────────────────────────┐
+   │   PostgreSQL       │              │   Dify Enterprise       │
+   │   (Supabase)       │              │   ─────────────────     │
+   │   ─────────────    │              │   kpi-analyst  (WF)     │
+   │   users            │              │   kpi-assistant (CF)    │
+   │   departments      │              │   bod-agent    (Agent)  │
+   │   kpi_items        │◄────────────►│                         │
+   │   kpi_actuals      │  context     │   Tool Calling:         │
+   │   analysis_drafts  │  injection   │   /api/agent/           │
+   │   external_data    │              │   get-kpi-trend         │
+   │   chat_messages    │              └─────────────────────────┘
+   └────────────────────┘                        │
+                                           Qwen LLM
+```
+
+---
+
+## Technology Stack
 
 | Layer | Teknologi | Keterangan |
 |---|---|---|
-| Frontend + Backend | Next.js 14 (App Router) | UI + API Routes |
-| Auth | NextAuth.js v5 | Session JWT, role-based |
-| Database | PostgreSQL Perusahaan | Aliyun RDS |
-| AI Platform | Dify Enterprise 1.11.8 | Self-hosted |
-| LLM | Qwen | Full access, sudah disediakan |
-| Excel Parser | SheetJS (xlsx) | Parse di browser |
-| Styling | Tailwind CSS | |
+| Frontend + Backend | Next.js 14 (App Router) | SSR + API Routes |
+| Autentikasi | NextAuth.js v5 | Session JWT, role-based routing |
+| Database | PostgreSQL (Supabase) | 7+ tabel, real-time calc |
+| AI Platform | Dify Enterprise 1.11.8 (self-hosted) | Workflow + Chatflow + Agent |
+| LLM | Qwen | Bahasa Indonesia, analytical |
+| Excel Parser | SheetJS (xlsx) | Parse di server-side |
+| Styling | Tailwind CSS + @tailwindcss/typography | Markdown rendering |
+| Markdown Chat | react-markdown | Render bold, heading, list di chat |
+| Charts | Recharts | Trend lines per KPI |
+| Validation | Zod | Schema validation |
+| Icons | lucide-react | UI icons |
 
 ---
 
-## Role & Akses
+## Role & Hak Akses
 
-| Role | Akses |
-|---|---|
-| `admin` | Upload Excel, kelola user, input data eksternal |
-| `corporate_planning` | Dashboard scorecard, trigger AI, kirim laporan ke BOD |
-| `direksi` | Baca laporan published, chat AI |
+| Role | Halaman yang Dapat Diakses | Kemampuan |
+|---|---|---|
+| `admin` | `/admin/*` | Upload Excel, kelola user, input & auto-fetch data eksternal |
+| `corporate_planning` | `/planning/*` | Dashboard scorecard, generate AI, publish laporan ke BOD |
+| `direksi` | `/board/*`, `/chat` | Baca laporan published, Executive Copilot AI |
 
 ---
 
@@ -56,53 +68,85 @@ Sistem manajemen KPI berbasis AI yang membantu tim Corporate Planning menghasilk
 ```
 kpi-system/
 ├── app/
-│   ├── login/                    # Halaman login
+│   ├── login/                          # Autentikasi
+│   ├── chat/                           # Executive Copilot (khusus direksi)
+│   │   ├── page.tsx
+│   │   └── ChatClient.tsx              # UI chat dengan history & markdown render
 │   ├── admin/
-│   │   ├── upload/               # Upload Excel + data eksternal
-│   │   ├── kpi-list/             # List & manage uploaded KPI per period
-│   │   └── users/                # Kelola user
+│   │   ├── page.tsx                    # Redirect ke /admin/upload
+│   │   ├── upload/                     # Upload Excel + Data Eksternal
+│   │   │   ├── page.tsx
+│   │   │   ├── UploadExcelForm.tsx
+│   │   │   └── ExternalDataForm.tsx
+│   │   ├── kpi-list/                   # List & hapus data KPI per periode
+│   │   └── users/                      # Kelola akun user
 │   ├── planning/
-│   │   ├── page.tsx              # List periode
-│   │   └── [period]/             # Workspace Corporate Planning
+│   │   ├── page.tsx                    # List semua periode
+│   │   └── [period]/
+│   │       ├── page.tsx
+│   │       └── PlanningWorkspace.tsx   # AI Workspace + Copilot Chat
 │   ├── board/
-│   │   ├── page.tsx              # List laporan BOD
-│   │   └── [period]/             # Laporan Direksi
+│   │   ├── page.tsx                    # List periode laporan
+│   │   └── [period]/
+│   │       ├── page.tsx
+│   │       └── BoardReport.tsx         # Laporan + Executive Assistant AI
 │   └── api/
-│       ├── auth/[...nextauth]/   # NextAuth handler
-│       ├── kpi/                  # GET scorecard
-│       ├── analysis/             # POST/GET analysis_drafts
-│       ├── dify/                 # Proxy Dify Workflow & Chat
-│       ├── parse-excel/          # Insert hasil parse ke DB
-│       └── external-data/
-│           ├── route.ts          # GET/POST data eksternal
-│           └── fetch/            # Auto-fetch dari API resmi
+│       ├── auth/[...nextauth]/         # NextAuth handler
+│       ├── kpis/
+│       │   ├── route.ts                # GET scorecard per dept/period
+│       │   ├── import/route.ts         # POST import KPI dari Excel
+│       │   └── periods/route.ts        # GET list periode, DELETE KPI periode
+│       ├── analytics/route.ts          # GET/POST analysis drafts
+│       ├── integrations/
+│       │   ├── dify/route.ts           # Proxy Dify (workflow + chat) + context injection
+│       │   └── external-data/
+│       │       ├── route.ts            # GET/POST/DELETE data eksternal
+│       │       └── fetch/route.ts      # Auto-fetch kurs, oil, inflasi
+│       ├── chats/history/route.ts      # GET riwayat chat dari DB
+│       ├── users/route.ts              # GET/POST/DELETE user (admin)
+│       ├── system/migrate/route.ts     # DB migration utility
+│       └── agent/                      # Endpoint khusus Dify Tool Calling
+│           └── get-kpi-trend/route.ts  # GET tren historis KPI per dept (auth via DIFY_AGENT_SECRET)
 ├── components/
-│   └── layout/AppShell.tsx       # Sidebar + layout utama
+│   ├── layout/AppShell.tsx             # Sidebar + layout utama + dark mode
+│   ├── ui/                             # Button, Card, Badge, Input, dll
+│   ├── features/
+│   │   ├── AdminDashboardCharts.tsx
+│   │   ├── BODDashboardCharts.tsx
+│   │   ├── DeptDashboardCharts.tsx
+│   │   └── DeleteKpiForm.tsx
+│   └── kpi/MacroEconomicsWidget.tsx    # Widget data makro ekonomi
 ├── lib/
-│   ├── auth.ts                   # NextAuth config
-│   ├── db.ts                     # Koneksi PostgreSQL
-│   ├── calc.ts                   # Kalkulasi KPI on-the-fly
-│   ├── dify.ts                   # Dify API wrapper
-│   └── parser.ts                 # SheetJS Excel parser
+│   ├── auth.ts                         # NextAuth config (JWT + DB session)
+│   ├── db.ts                           # Koneksi PostgreSQL (postgres package)
+│   ├── calc.ts                         # getDeptScorecard, getAllScorecards, kalkulasi on-the-fly
+│   ├── dify.ts                         # runKpiAnalyst(), sendChatMessage()
+│   ├── external.ts                     # gatherExternalMacroData(), DATA_PROVIDERS
+│   └── parser.ts                       # SheetJS Excel parser
+├── dify/
+│   ├── kpi-analyst.yml                 # Dify Workflow config (exportable)
+│   ├── kpi-assistant.yml               # Dify Chatflow config
+│   └── stable/v3/
+│       └── v3-web-kpi-assistant.yml    # Versi stabil terbaru
 ├── scripts/sql/
-│   ├── 001_init.sql              # Buat semua tabel
-│   └── 002_seed.sql              # Seed departments + KPI dictionary
-├── types/index.ts                # TypeScript types
-├── middleware.ts                 # Route protection by role
-└── .env.example                  # Template environment variables
+│   ├── 001_init.sql                    # DDL tabel + enum + index
+│   └── 002_seed.sql                    # Seed departments + KPI dictionary
+├── types/index.ts                      # TypeScript types global
+├── middleware.ts                       # Route protection by role (bypass /api/agent)
+└── .env.local                          # Environment variables (tidak di-commit)
 ```
 
 ---
 
-## Cara Install & Jalankan
+## Setup & Instalasi
 
 ### Prasyarat
 - Node.js 18+
-- Akses ke PostgreSQL perusahaan
-- Dify Enterprise 1.11.8 sudah running
-- npm atau yarn
+- PostgreSQL (Supabase, Neon, atau self-hosted)
+- Dify Enterprise sudah running & dikonfigurasi
+- npm
 
-### 1. Clone & Install Dependencies
+### 1. Clone & Install
 
 ```bash
 git clone <repo-url> kpi-system
@@ -110,39 +154,44 @@ cd kpi-system
 npm install
 ```
 
-### 2. Setup Environment Variables
+### 2. Environment Variables
 
 ```bash
 cp .env.example .env.local
 ```
 
-Edit `.env.local` dengan nilai sebenarnya:
+Isi `.env.local`:
 
 ```env
-# PostgreSQL Perusahaan
-PGHOST=xx-xxxxxxxxxx.gpdbmaster.ap-southeast-5.rds.aliyuncs.com
+# PostgreSQL
+PGHOST=<host>
 PGPORT=5432
-PGDATABASE=dxxxxxxxxx
-PGUSER=dxxxx
-PGPASSWORD=xxxxxxxxxxxxxxxxxx
+PGDATABASE=postgres
+PGUSER=<user>
+PGPASSWORD=<password>
 
 # NextAuth
 NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=<generate dengan: openssl rand -base64 32>
+AUTH_URL=http://localhost:3000
+AUTH_TRUST_HOST=true
+NEXTAUTH_SECRET=<openssl rand -base64 32>
 
 # Dify Enterprise
-DIFY_BASE_URL=https://your-dify.company.com
-DIFY_WORKFLOW_API_KEY=app-xxxxxxxxxxxxxxxxxxxx
-DIFY_CHATFLOW_API_KEY=app-xxxxxxxxxxxxxxxxxxxx
+DIFY_BASE_URL=http://dify-api.your-domain.com/v1
+DIFY_WORKFLOW_API_KEY=app-xxxxxxxxxx
+DIFY_CHATFLOW_API_KEY=app-xxxxxxxxxx
+DIFY_EXECUTIVE_AGENT_API_KEY=app-xxxxxxxxxx
 
-# External Data APIs (opsional, bisa diisi manual jika tidak ada)
-EIA_API_KEY=your-eia-api-key
-BPS_API_KEY=your-bps-api-key
+# Agent Tool Calling Secret (dibuat sendiri, dimasukkan ke Dify Custom Tool)
+DIFY_AGENT_SECRET=rahasia-agent-xxx
+
+# External Data APIs
+FRANKFURTER_URL=https://api.frankfurter.app
+EIA_API_KEY=<daftar di eia.gov>
+BPS_API_KEY=<daftar di webapi.bps.go.id>
 ```
 
 ### 3. Setup Database
-
-Jalankan SQL di PostgreSQL perusahaan (urut):
 
 ```bash
 # Via psql:
@@ -150,263 +199,81 @@ psql -h $PGHOST -U $PGUSER -d $PGDATABASE -f scripts/sql/001_init.sql
 psql -h $PGHOST -U $PGUSER -d $PGDATABASE -f scripts/sql/002_seed.sql
 ```
 
-Atau copy-paste isi file SQL ke tool database yang dipakai (DBeaver, pgAdmin, dsb).
+Atau copy-paste isi `.sql` ke DBeaver / pgAdmin / Supabase SQL Editor.
 
-Setelah selesai, sistem akan otomatis membuat:
-- 8 tabel (users, departments, kpi_dictionary, kpi_items, kpi_actuals, analysis_drafts, external_data, upload_logs)
-- 1 akun admin default: `admin@company.com` / `admin123`
-- Data departments dari hirarki PTX (sesuai Dictionary.xlsx)
-- KPI Dictionary dari Dictionary.xlsx
-
-> ⚠️ **Ganti password admin segera setelah login pertama!**
-
-### 4. Setup Dify Enterprise
-
-#### App 1: kpi-analyst (Workflow)
-
-1. Buka Dify Enterprise → **Studio → Create App → Workflow**
-2. Beri nama: `kpi-analyst`
-3. Buat node berikut:
-
-```
-[Start]
-  Input variables:
-  - action (string): "analyze" | "summarize" | "suggest"
-  - dept_name (string)
-  - period (string): format YYYY-MM
-  - kpi_data (string): JSON array KPI items
-  - external_data (string): JSON array data eksternal
-
-[Knowledge Retrieval]
-  Knowledge Base: kpi-context
-  Query: "{{dept_name}} {{period}} KPI analisis konteks"
-  Top K: 5
-
-[IF Node — branch by action]
-  Condition: {{action}} == "analyze"
-  → True: LLM Node (analyze prompt)
-  → False: IF action == "summarize" → LLM Node (summarize) / LLM Node (suggest)
-
-[LLM Node — Qwen]
-  System Prompt (sesuaikan per action):
-
-  === ANALYZE ===
-  Kamu adalah KPI analyst senior maskapai penerbangan.
-  Analisis data KPI berikut dan identifikasi:
-  1. KPI yang underperform (ach_rate < 90%)
-  2. Root cause analysis berdasarkan key drivers
-  3. Dampak terhadap pilar strategis perusahaan
-  4. Konteks data eksternal yang relevan
-  Gunakan bahasa Indonesia formal. Jawab komprehensif.
-  
-  Konteks kebijakan: {{knowledge}}
-  Data KPI: {{kpi_data}}
-  Data Eksternal: {{external_data}}
-  Departemen: {{dept_name}} | Periode: {{period}}
-
-  === SUMMARIZE ===
-  Buat executive summary ringkas (maks 300 kata) dari data KPI berikut untuk Direksi.
-  Highlight: total score, KPI kritis, dan 3 rekomendasi utama.
-  [lanjutkan dengan data...]
-
-  === SUGGEST ===
-  Berikan rekomendasi improvement yang spesifik dan actionable untuk setiap KPI
-  dengan ach_rate < 90%. Format: KPI → Rekomendasi → Target perbaikan → Penanggung jawab.
-  [lanjutkan dengan data...]
-
-[End]
-  Output: result (text dari LLM)
-```
-
-4. Publish app → copy **API Key** → masukkan ke `.env.local` sebagai `DIFY_WORKFLOW_API_KEY`
-
-#### App 2: kpi-assistant (Chatflow)
-
-1. Buka Dify Enterprise → **Studio → Create App → Chatflow**
-2. Beri nama: `kpi-assistant`
-3. System Prompt:
-
-```
-Kamu adalah KPI Management Assistant untuk perusahaan maskapai penerbangan.
-
-Role pengguna: {{role}}
-Konteks data: {{context}}
-
-Jika role = "corporate_planning":
-- Bantu menganalisis, memperkaya, dan menyempurnakan draft laporan KPI
-- Berikan insight tambahan berdasarkan data eksternal dan konteks industri
-- Gunakan bahasa Indonesia formal dan teknis
-
-Jika role = "direksi":
-- Jawab pertanyaan secara ringkas dan actionable
-- Fokus pada dampak bisnis dan rekomendasi strategis
-- Hindari detail teknis yang tidak perlu
-
-Selalu referensikan data aktual dari konteks yang diberikan.
-```
-
-4. Publish app → copy **API Key** → masukkan ke `.env.local` sebagai `DIFY_CHATFLOW_API_KEY`
-
-#### Knowledge Base: kpi-context
-
-1. Buka Dify Enterprise → **Knowledge → Create Knowledge**
-2. Beri nama: `kpi-context`
-3. Upload dokumen awal:
-   - Kebijakan KPI perusahaan (PDF/DOCX)
-   - Dictionary.xlsx (sheet KPI Dictionary)
-   - Definisi grade: Hijau ≥ 90%, Kuning 75–89%, Merah < 75%
-4. Pastikan Knowledge Base ini terhubung ke kedua App di atas
-
-### 5. Tambah User
+### 4. Jalankan Server
 
 ```bash
-# Via API (setelah server running):
-curl -X POST http://localhost:3000/api/admin/users \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Budi Santoso","email":"budi@company.com","password":"password123","role":"corporate_planning"}'
-```
-
-Atau tambah langsung via SQL:
-
-```sql
--- Generate hash dulu: bcrypt.hash('password123', 12)
-INSERT INTO users (name, email, password_hash, role) VALUES
-  ('Budi Santoso', 'budi@company.com', '$2a$12$...hash...', 'corporate_planning'),
-  ('Direktur Utama', 'dirut@company.com', '$2a$12$...hash...', 'direksi');
-```
-
-### 6. Jalankan Server
-
-```bash
-# Development
 npm run dev
 # → http://localhost:3000
-
-# Production build
-npm run build
-npm start
 ```
 
 ---
 
-## Panduan Penggunaan per Role
+## API Endpoints
 
-### 👤 Admin
+### Internal (Dilindungi NextAuth Session)
 
-#### Upload KPI Excel Bulanan
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| `GET` | `/api/kpis?period=&dept_id=` | Ambil scorecard per dept atau semua dept |
+| `POST` | `/api/kpis/import` | Import data KPI dari Excel ke DB |
+| `GET/DELETE` | `/api/kpis/periods` | List atau hapus data per periode |
+| `GET/POST` | `/api/analytics` | Ambil / simpan draft analisis AI |
+| `POST` | `/api/integrations/dify` | Proxy ke Dify (workflow & chat) |
+| `GET/POST/DELETE` | `/api/integrations/external-data` | Kelola data makro ekonomi |
+| `GET` | `/api/integrations/external-data/fetch` | Auto-fetch data dari API eksternal |
+| `GET` | `/api/chats/history` | Riwayat chat user yang sedang login |
+| `GET/POST/DELETE` | `/api/users` | Manajemen user (admin only) |
 
-1. Login → otomatis redirect ke `/admin/upload`
-2. **Bagian 1 — Upload Excel:**
-   - Pilih **Level KPI**: Corporate (L1) / Department (L2) / Unit (L3)
-   - Pilih **Departemen** dari dropdown (terisi dari DB)
-   - Pilih **Periode** (format YYYY-MM, contoh: 2025-03)
-   - Drag & drop file `.xlsx` atau klik untuk pilih
-   - Sistem akan otomatis parse dan tampilkan **preview tabel**
-   - Cek validasi: total bobot harus 100%, tidak ada field kosong
-   - Klik **Confirm & Simpan**
+### Agent / Tool Calling (Dilindungi `DIFY_AGENT_SECRET`)
 
-3. **Bagian 2 — Data Eksternal:**
-   - Pilih periode
-   - Klik **🔄 Auto-fetch dari API** → kurs USD/IDR, crude oil, inflasi terisi otomatis
-   - Isi manual: **Harga Avtur** (IDR/liter) dan **Market Share** (%)
-   - Klik **Simpan Data Eksternal**
-
-4. **Bagian 3 — Update Knowledge Base Dify:**
-   - Klik link **Buka Dify Enterprise → Knowledge Base**
-   - Upload dokumen terbaru (laporan riset, data industri, dll)
-
-5. **Bagian 4 — Kelola & Hapus Data KPI:**
-   - Ke menu **List Data KPI** (`/admin/kpi-list`)
-   - Lihat semua file KPI yang terupload dan di-grouping per periode.
-   - Pilihan "Hapus": bisa menghapus keseluruhan data sistem (Reset), per periode, atau per departemen/unit spesifik.
-
-#### Format Excel yang Diterima
-
-File harus menggunakan **template resmi** dengan sheet bernama `KPI` (huruf kapital).
-
-| Level | Kolom Wajib |
-|---|---|
-| Corporate (L1) | No, Objective Sentence, Action Verb/KPI, From, To, Parameters, Bobot (%), Key Driver, Polaritas, Remarks |
-| Department (L2) | + Cascaded from Direksi |
-| Unit (L3) | + Cascaded from Dept. X (boleh multi-baris per KPI) |
-
-> ℹ️ Kolom `Departemen` dan `Unit` di file Excel diabaikan — diambil dari pilihan dropdown UI.
+| Method | Endpoint | Parameter | Fungsi |
+|---|---|---|---|
+| `GET` | `/api/agent/get-kpi-trend` | `dept_name`, `months` | Tren historis KPI 1-36 bulan |
 
 ---
 
-### 📊 Corporate Planning
+## Kalkulasi KPI (On-the-fly)
 
-1. Login → otomatis redirect ke `/planning`
-2. Pilih **periode aktif** atau klik tombol periode terbaru
-
-#### Di halaman `/planning/[period]`:
-
-**Panel Kiri — Scorecard:**
-- Lihat daftar semua dept/unit dengan warna grade:
-  - 🟢 ≥ 90% | 🟡 75–89% | 🔴 < 75%
-- Klik departemen untuk buka workspace-nya
-- Data eksternal (kurs, avtur, dll) ditampilkan di bagian bawah
-
-**Panel Kanan — AI Workspace:**
-- Pilih departemen dari panel kiri
-- Lihat tabel KPI lengkap dengan ach_rate dan score
-- Klik salah satu tombol:
-  - **🔍 Analyze** → AI analisis mendalam KPI underperform + konteks eksternal
-  - **📋 Summarize** → AI buat executive summary ringkas untuk BOD
-  - **💡 Suggest** → AI buat rekomendasi improvement actionable
-- Draft analisis muncul di textarea → **bisa diedit langsung**
-- Gunakan **Chat AI** di bagian bawah untuk perkaya konten:
-  - `"Tambahkan dampak kenaikan avtur ke bagian KPI Cost"`
-  - `"Buat rekomendasi untuk KPI Infrastructure lebih spesifik"`
-- Klik **✅ Kirim ke BOD →** → laporan dikirim ke Direksi
-
----
-
-### 🏢 Direksi / BOD
-
-1. Login → otomatis redirect ke `/board`
-2. Pilih periode laporan yang tersedia
-
-#### Di halaman `/board/[period]`:
-
-**Panel Kiri:**
-- Daftar laporan yang sudah dikirim Corporate Planning
-- Pilih laporan departemen/unit yang ingin dibaca
-
-**Panel Utama:**
-- Baca konten laporan analisis lengkap
-- Informasi: periode, tanggal dikirim, dept terkait
-
-**Chat AI:**
-- Tanya langsung ke AI tentang laporan yang sedang dibaca:
-  - `"Apa 3 risiko utama bulan ini?"`
-  - `"Kenapa KPI Infrastructure turun? Apa rekomendasinya?"`
-  - `"Bandingkan performa dept IT vs HR bulan ini"`
-
----
-
-## Kalkulasi KPI
-
-Semua kalkulasi dilakukan **on-the-fly** dari database, tidak ada angka yang di-cache:
+Semua kalkulasi dilakukan langsung dari database saat request. Tidak ada angka yang di-cache atau di-pre-compute.
 
 ```
-Polaritas MAX  → ach_rate = actual / target
-Polaritas MIN  → ach_rate = target / actual   (lebih kecil = lebih baik)
-Score          → score    = ach_rate × bobot
-Total Score    → SUMPRODUCT(score[])
+Polaritas MAX  → ach_rate = actual / target_to
+Polaritas MIN  → ach_rate = target_to / actual   (lebih kecil = lebih baik)
+Score per KPI  → score    = ach_rate × bobot
+Total Score    → Σ(score[]) untuk semua KPI items
 
 Grade:
-  🟢 ≥ 90%  (total_score ≥ 0.9)
-  🟡 75–89% (total_score ≥ 0.75)
-  🔴 < 75%  (total_score < 0.75)
+  🟢 Green  ≥ 90%  (total_score ≥ 0.90)
+  🟡 Yellow 75–89% (total_score ≥ 0.75)
+  🔴 Red    < 75%  (total_score < 0.75)
 ```
 
-Contoh KPI Polaritas MIN (HR — Time-to-Fill):
-```
-Target: 45 hari | Aktual: 42 hari | Bobot: 15%
-ach_rate = 45 / 42 = 1.071 (melebihi target, bagus)
-score    = 1.071 × 0.15 = 0.1607 (16.07%)
-```
+---
+
+## Dify AI Architecture
+
+### 3 AI Apps yang Dikonfigurasi:
+
+| App | Type | Key | Digunakan untuk |
+|---|---|---|---|
+| `kpi-analyst` | Workflow | `DIFY_WORKFLOW_API_KEY` | Generate analisis, ringkasan, saran di Planning |
+| `kpi-assistant` | Chatflow | `DIFY_CHATFLOW_API_KEY` | Copilot chat Corporate Planning |
+| `bod-agent` | Agent | `DIFY_EXECUTIVE_AGENT_API_KEY` | Executive Copilot BOD (streaming + Tool Calling) |
+
+### Context Injection (General Chat BOD)
+
+Setiap kali BOD membuka `/chat`, server otomatis menyuntikkan ke dalam prompt:
+- **KPI L1 Corporate** lengkap dengan detail semua KPI items
+- **KPI L2 (Departemen) & L3 (Unit)** — semua entitas dengan skor & detail KPI
+- **Data Makro Ekonomi** — kurs USD/IDR, crude oil, inflasi, avtur, market share
+
+Ini memungkinkan AI menjawab pertanyaan tentang **departemen atau unit manapun** tanpa harus memanggil API tambahan.
+
+### Tool Calling (Drill-down Historis)
+
+Endpoint `/api/agent/get-kpi-trend` terhubung sebagai **Custom Tool** di Dify. AI akan memanggilnya otomatis jika BOD menanyakan tren historis > 6 bulan.
 
 ---
 
@@ -416,38 +283,36 @@ score    = 1.071 × 0.15 = 0.1607 (16.07%)
 |---|---|---|
 | Login gagal | Password salah / user tidak aktif | Cek tabel `users`, pastikan `is_active = true` |
 | Upload Excel error "Sheet KPI tidak ditemukan" | Nama sheet berbeda | Rename sheet menjadi `KPI` (huruf kapital) |
-| Upload Excel error "Total bobot ≠ 100%" | Bobot tidak pas 100 | Periksa kolom Bobot, pastikan jumlah = 100% |
-| Dify gagal generate | API key salah / Dify tidak running | Cek `DIFY_BASE_URL` dan API key di `.env.local` |
-| Auto-fetch kurs gagal | Tidak ada internet / Frankfurter down | Isi manual di form data eksternal |
-| Scorecard tidak muncul | Belum ada kpi_items untuk periode ini | Admin upload Excel terlebih dahulu |
-| "Belum lengkap" di scorecard | Ada KPI item yang belum punya actual_value | Tambah data aktual via upload atau UI |
+| Upload Excel error "Total bobot ≠ 100%" | Bobot salah | Periksa kolom Bobot, pastikan jumlah = 100% |
+| AI tidak bisa jawab data dept/unit | — | Pastikan ada data untuk periode tersebut di DB |
+| Dify error 502 | API key salah / Dify down | Cek `DIFY_BASE_URL` dan semua API key di `.env.local` |
+| Tool Calling Unauthorized | Secret tidak cocok | Pastikan `DIFY_AGENT_SECRET` sama di `.env.local` dan konfigurasi Dify Custom Tool |
+| Auto-fetch kurs gagal | No internet / Frankfurter down | Isi manual di form data eksternal |
+| Scorecard tidak muncul | Belum ada kpi_items untuk periode ini | Admin upload Excel dulu |
 
 ---
 
 ## Development Notes
 
 ### Menambah Departemen Baru
-
 ```sql
 INSERT INTO departments (level, name, head_position, unit_name, parent_id)
-VALUES ('L2', 'Operations', 'Director of Operations', NULL, '00000000-0000-0000-0000-000000000001');
+VALUES ('L2', 'New Department', 'Head of New Dept', NULL, '<parent-uuid>');
 ```
 
-### Mengganti Password User
-
+### Reset Password User
 ```sql
--- Hash password baru dulu dengan bcrypt (12 rounds)
+-- Hash dulu dengan bcrypt (12 rounds), lalu:
 UPDATE users SET password_hash = '$2a$12$...' WHERE email = 'user@company.com';
 ```
 
-### Memahami Struktur Periode
-
-Format periode: `YYYY-MM` (contoh: `2025-03` untuk Maret 2025)
-
-Satu file Excel = satu dept + satu periode. Jika upload ulang dept + periode yang sama, data lama akan **ditimpa**.
+### Format Periode
+- Format: `YYYY-MM` (contoh: `2025-12` untuk Desember 2025)
+- Satu upload = satu dept + satu periode
+- Upload ulang dept + periode yang sama → data lama **ditimpa**
 
 ---
 
 ## Lisensi
 
-Internal use only — PT X (Perusahaan).
+Internal use only.

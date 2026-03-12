@@ -50,7 +50,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'query wajib diisi.' }, { status: 400 })
     }
 
-    // Jika ini general chat (dari BOD /chat dashboard), kita suntikkan performa KPI L1 beserta Makro Ekonomi otomatis.
+    // Jika ini general chat (dari BOD /chat dashboard):
+    // Inject SEMUA level KPI — L1 detail penuh, L2/L3 sebagai summary ringkas.
+    // Tujuannya agar BOD bisa menanyakan data departemen & unit tertentu, bukan hanya L1.
     if (context && context.general_chat) {
       let periodParam = body.period || context.period;
       if (!periodParam) {
@@ -60,15 +62,62 @@ export async function POST(req: NextRequest) {
 
       if (periodParam) {
         const allScores = await getAllScorecards(periodParam);
-        const l1Scores = allScores.filter(s => s.level === 'L1');
 
-        context.kpi_summary = {
+        // L1: full detail (sedikit entitas, data lengkap berguna)
+        const l1Full = allScores
+          .filter(s => s.level === 'L1')
+          .map(s => ({
+            dept_name: s.dept_name,
+            unit_name: s.unit_name,
+            level: s.level,
+            total_score_pct: s.total_score !== null ? parseFloat((s.total_score * 100).toFixed(2)) : null,
+            grade: s.grade,
+            kpi_items: s.kpi_items.map(k => ({
+              no: k.no,
+              name: k.action_verb,
+              target_to: k.target_to,
+              actual: k.actual_value,
+              ach_rate_pct: k.ach_rate !== null ? parseFloat((k.ach_rate * 100).toFixed(1)) : null,
+              score_pct: k.score !== null ? parseFloat((k.score * 100).toFixed(2)) : null,
+              bobot_pct: parseFloat((k.bobot * 100).toFixed(0)),
+            }))
+          }));
+
+        // L2 & L3: hanya summary skor (banyak entitas, hemat token, cukup untuk menjawab)
+        const l2l3Summary = allScores
+          .filter(s => s.level === 'L2' || s.level === 'L3')
+          .map(s => ({
+            dept_name: s.dept_name,
+            unit_name: s.unit_name,
+            level: s.level,
+            total_score_pct: s.total_score !== null ? parseFloat((s.total_score * 100).toFixed(2)) : null,
+            grade: s.grade,
+            kpi_count: s.kpi_items.length,
+            // Kirim detail KPI per item supaya AI bisa menjawab pertanyaan spesifik
+            kpi_items: s.kpi_items.map(k => ({
+              no: k.no,
+              name: k.action_verb,
+              target_to: k.target_to,
+              actual: k.actual_value,
+              ach_rate_pct: k.ach_rate !== null ? parseFloat((k.ach_rate * 100).toFixed(1)) : null,
+              score_pct: k.score !== null ? parseFloat((k.score * 100).toFixed(2)) : null,
+              bobot_pct: parseFloat((k.bobot * 100).toFixed(0)),
+            }))
+          }));
+
+        context.kpi_data = {
           period: periodParam,
-          level: 'Corporate (L1)',
-          departments: l1Scores.length > 0 ? l1Scores : 'Tidak ada data L1 ditemukan',
+          corporate_l1: l1Full,
+          departments_and_units: l2l3Summary,
+          total_entities: allScores.length,
         };
         context.external_data = await gatherExternalMacroData(periodParam, session.user.id);
-        context.info = `Data L1 Corporate (seluruh perusahaan) & makro ekonomi untuk periode ${periodParam} telah disisipkan. JANGAN asumsikan data sendiri, JAWAB berdasarkan context JSON.`;
+        context.info = [
+          `Konteks KPI LENGKAP untuk periode ${periodParam} telah disisipkan, mencakup ${allScores.length} entitas (L1 Corporate, L2 Departemen, L3 Unit).`,
+          `Gunakan 'corporate_l1' untuk pertanyaan level perusahaan.`,
+          `Gunakan 'departments_and_units' untuk pertanyaan per departemen atau unit (Finance, HRD, Quality Assurance, dll).`,
+          `JAWAB HANYA berdasarkan data dalam context. Jangan mengarang angka.`
+        ].join(' ');
       }
     } else if (context && context.external_data) {
       // Untuk memastikan Chatflow mendapat insight data makro aktual

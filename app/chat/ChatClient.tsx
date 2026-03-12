@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Bot, Send, RefreshCw, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import AppShell from '@/components/layout/AppShell'
+import ReactMarkdown from 'react-markdown'
 
 interface ChatClientProps {
     user: {
@@ -222,9 +223,13 @@ export default function ChatClient({ user }: ChatClientProps) {
                             )}
                             <div className={`px-5 py-3.5 rounded-2xl max-w-[85%] text-sm leading-relaxed shadow-sm ${msg.role === 'user'
                                 ? 'bg-primary-600 dark:bg-primary-700 text-white rounded-br-sm'
-                                : 'bg-white dark:bg-gray-800 border border-gray-200/60 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-sm whitespace-pre-wrap'
+                                : 'bg-white dark:bg-gray-800 border border-gray-200/60 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-sm'
                                 }`}>
-                                {msg.text}
+                                {msg.role === 'ai' ? (
+                                    <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-li:my-0.5 prose-blockquote:my-1 prose-blockquote:text-gray-500 prose-blockquote:border-primary-300 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-code:bg-gray-100 dark:prose-code:bg-gray-700 prose-code:px-1 prose-code:rounded">
+                                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                    </div>
+                                ) : msg.text}
                             </div>
                         </div>
                     ))}

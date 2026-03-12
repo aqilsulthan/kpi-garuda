@@ -5,6 +5,7 @@ import { Send, RefreshCw, FileText, Bot, Building2, ChevronLeft, Download } from
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import ReactMarkdown from 'react-markdown'
 
 interface Report {
   id: string; dept_id: string; period: string
@@ -173,10 +174,26 @@ export default function BoardReport({
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`px-4 py-2.5 rounded-2xl max-w-[85%] text-[13px] leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-primary-600 text-white rounded-br-sm' : 'bg-gray-50 border border-gray-100 text-gray-800 rounded-bl-sm'
                         }`}>
-                        {msg.text}
+                        {msg.role === 'ai' ? (
+                          <div className="prose prose-xs max-w-none prose-p:my-1 prose-headings:my-1.5 prose-li:my-0 prose-strong:text-gray-900 prose-blockquote:text-gray-500 prose-blockquote:border-primary-300 prose-code:bg-gray-200 prose-code:px-1 prose-code:rounded text-[13px]">
+                            <ReactMarkdown>{msg.text}</ReactMarkdown>
+                          </div>
+                        ) : msg.text}
                       </div>
                     </div>
                   ))}
+                  {chatting && (
+                    <div className="flex justify-start">
+                      <div className="px-4 py-2.5 rounded-2xl text-[13px] leading-relaxed shadow-sm bg-gray-50 border border-gray-100 text-gray-500 italic rounded-bl-sm flex items-center gap-2">
+                        <span className="flex items-center gap-1.5 opacity-70">
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </span>
+                        <span>Memproses jawaban...</span>
+                      </div>
+                    </div>
+                  )}
                   <div ref={chatEndRef} />
                 </div>
 

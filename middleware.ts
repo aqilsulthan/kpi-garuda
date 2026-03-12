@@ -7,7 +7,7 @@ export default auth((req) => {
   const path = nextUrl.pathname
 
   // Public routes
-  if (path === '/login' || path === '/signup' || path.startsWith('/api/auth')) {
+  if (path === '/login' || path === '/signup' || path.startsWith('/api/auth') || path.startsWith('/api/agent')) {
     return NextResponse.next()
   }
 
